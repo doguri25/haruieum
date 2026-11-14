@@ -25,6 +25,8 @@ import "./youtube";      // window.youtubeUI (유튜브 검색·재생)
 import "./lunch";        // window.lunch (급식·알레르기)
 import "./school-calendar"; // window.schoolCalendar (학사일정·휴일 자동 무음, 2.7.0)
 import "./backup";       // window.dataBackup (데이터 백업·복원, 2.7.0)
+import "./autostart";    // window.appAutostart (PC 켜면 자동 실행, 2.8.0)
+import "./qr";           // window.qr (QR 코드 만들기, 2.8.0)
 // 글꼴: 구글 폰트 CDN 대신 앱에 포함 (오프라인에서도 같은 모양)
 import "@fontsource/jua";
 import "@fontsource/nanum-gothic";

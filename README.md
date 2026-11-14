@@ -2,7 +2,7 @@
 
 기존 일렉트론 버전(v1.6.11)을 Tauri 2 + Vite + TypeScript로 옮기는 프로젝트입니다.
 
-## 현재 상태: v2.7.0
+## 현재 상태: v2.8.0
 - 1단계: Tauri 창에서 기존 앱 실행
 - 2단계:
   - 인라인 스크립트 → `src/legacy-app.js` 로 분리 (기능 변경 없음)
@@ -120,7 +120,7 @@
     크게 보기는 사진 도구 버튼 또는 사진 두 번 누르기(판서·알림·보관 기록 보기), 누르거나 ESC 로 닫힘
   - **±10% 버튼 버그**: TipTap 크기 조절 노드뷰는 처음 그릴 때만 width/height 를 화면에 적용해서, 속성이 바뀌어도 화면 크기는 그대로였음 →
     `BoardImage.addNodeView` 에서 update 때마다 맞춤
-- v2.7.0 (지금): 버그 9건 수정 + 창 위치 기억 + 학사일정·휴일 무음 + 급식 날짜 이동 + 기록 불러오기 + 알림장 자동 보관 + 백업·복원
+- v2.7.0: 버그 9건 수정 + 창 위치 기억 + 학사일정·휴일 무음 + 급식 날짜 이동 + 기록 불러오기 + 알림장 자동 보관 + 백업·복원
   - 버그 수정
     - **되돌리기 덮어쓰기**: `setHTML`(시작·판서↔알림 전환)이 되돌리기 기록에 남아, 알림으로 바꾼 뒤 Ctrl+Z 한 번에 판서 내용이 돌아와
       알림장으로 저장됐음 → 내용을 바꿀 때 `EditorState.create` 로 기록을 비움 (`src/board-editor.ts`)
@@ -146,6 +146,16 @@
   - **데이터 백업·복원** (`src/backup.ts`, Rust `export_backup`/`import_backup`, `zip` 크레이트): 저장 파일 json·images·alarm 을 zip 하나로.
     복원은 백업 안의 json 을 먼저 모두 검사한 뒤, 지금 데이터를 `<앱 데이터>/backups/before-restore-<시각>.zip` 으로 남기고 교체 → 화면 다시 읽기.
     교체 중에는 `storage.suspend()` 로 메모리의 옛 내용이 파일을 덮어쓰지 않게 함. 창 위치·로그인 정보는 넣지 않음
+- v2.8.0 (지금): PC 켜면 자동 실행 · 타이머 미리 알림 · QR 코드 · 작은 수정
+  - **자동 실행** (`src/autostart.ts`, `tauri-plugin-autostart`, 권한 `autostart:default`): 환경설정 → 앱 시작 체크. 누르는 즉시 등록/해제
+    (윈도우: HKCU Run, 리눅스: ~/.config/autostart/SmartBoard.desktop). 처음엔 꺼짐
+  - **타이머**: 진행 막대(`#timer-progress`, 남은 비율 = 남은 시간 / 전체 시간, 시간을 더하면 전체도 늘어남),
+    미리 알림 5·3·1분 전(`checkTimerWarnings`) — 그 분을 지나는 순간 한 번 종 + "N분 남았습니다", 그 분보다 짧은 타이머는 안 울림,
+    시간을 더해 다시 위로 올라가면 다시 울릴 수 있음. 체크 상태는 `smartBoardTimerWarn`
+  - **QR 코드** (`src/qr.ts`, qrcode-generator MIT): 도구 메뉴 'QR'(도구 설정에서 숨김 가능). UTF-8 로 넣어 한글도 됨.
+    크게 보기는 PNG 를 이미지 보기 창으로, 판서에 넣기는 `boardEditor.insertPreparedImage` 로 다시 압축하지 않고 PNG 그대로
+  - 선생님 입력(과목·명렬표·뽑기 결과·보관 기록 제목)을 HTML 에 넣을 때 escape (`escHtml`), 날씨 오류 문구 escape
+  - GIF 는 10MB 이하면 원본 그대로 저장(움직임 유지). 회전하면 PNG 로 (첫 장면)
 
 ## 개발 PC 준비 (macOS, 한 번만)
 ```bash

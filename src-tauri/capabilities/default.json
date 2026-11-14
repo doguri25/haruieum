@@ -18,6 +18,7 @@
     "opener:default",
     "dialog:default",
     "window-state:allow-save-window-state",
+    "autostart:default",
     {
       "identifier": "http:default",
       "allow": [

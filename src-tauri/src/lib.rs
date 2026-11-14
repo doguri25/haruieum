@@ -7,6 +7,7 @@
 // 2.5.0: 로그인 기억 — WebView2(엣지 엔진)의 비밀번호 저장/자동 채우기 켜기
 // 2.6.0: 판서 사진을 data/images 파일로 (save_image·read_image·cleanup_images, sbimg 프로토콜)
 // 2.7.0: 창 위치·크기 기억 (tauri-plugin-window-state), 데이터 백업·복원 (export_backup / import_backup)
+// 2.8.0: PC 켜면 자동 실행 (tauri-plugin-autostart)
 //
 // 저장 위치: <앱 데이터 폴더>/data/
 //   settings.json, board.json, notice.json, saved-boards.json, popup-note.json
@@ -538,6 +539,8 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(login_memory_plugin())
+        // 2.8.0: PC 를 켜면 자동 실행 (환경설정에서 켜고 끔. 윈도우는 사용자 레지스트리 Run 항목)
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         // 2.7.0: 메인 창의 위치·크기·최대화를 기억 (듀얼 모니터에서 닫은 화면에 다시 뜸).
         // 저장된 위치가 지금 연결된 어느 모니터에도 걸치지 않으면(모니터를 뺀 경우) 위치는 되살리지 않고 OS 에 맡김.
         // 창은 숨긴 채 만들어지고(tauri.conf.json visible:false) 위치를 되살린 뒤 이 플러그인이 보여 줌

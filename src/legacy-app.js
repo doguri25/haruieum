@@ -15,6 +15,10 @@ const onReady = (fn) => (document.readyState === "loading" ? document.addEventLi
 
 export function startLegacyApp() {
 
+        // 2.8.0: 선생님이 입력한 글자(과목·학생 이름·기록 제목)를 HTML 에 넣을 때 쓰는 escape.
+        // 예전엔 그대로 넣어서 과목에 큰따옴표(")를 쓰면 시간표 칸이 깨졌음
+        function escHtml(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
+
         // (일렉트론 전용 localStorage 파일 패치는 제거됨 — 3단계에서 Tauri 파일 저장으로 대체)
 
         let timeSlots = [ { id: 1, name: '1교시', start: '09:00', end: '09:40' }, { id: 2, name: '2교시', start: '09:50', end: '10:30' }, { id: 3, name: '3교시', start: '10:40', end: '11:20' }, { id: 4, name: '4교시', start: '11:30', end: '12:10' }, { id: 5, name: '점심', start: '12:10', end: '13:00' }, { id: 6, name: '5교시', start: '13:00', end: '13:40' }, { id: 7, name: '6교시', start: '13:50', end: '14:30' } ];
@@ -72,6 +76,11 @@ export function startLegacyApp() {
         let tempToolPanelPos = toolPanelPos;
         
         let timerRemaining = 0; let isTimerRunning = false;
+        // 2.8.0: 진행 막대용 전체 시간(초)과 미리 알림(5·3·1분 전, 체크로 켜고 끔)
+        let timerTotal = 0;
+        let timerWarned = {};
+        let timerWarn = { 5: true, 3: true, 1: true };
+        try { const w = JSON.parse(storage.getItem('smartBoardTimerWarn') || 'null'); if (w && typeof w === 'object') timerWarn = { ...timerWarn, ...w }; } catch(e) {}
         let audioCtx = null; let isAudioPlaying = false; let currentOscillators = []; let chimeTimeout = null; let alarmCountdownIntervalId = null;
         let currentMp3Audio = null;
         let currentCalendarDate = new Date(); let isFakeFullscreen = false;
@@ -164,7 +173,7 @@ export function startLegacyApp() {
                 applyPopupNoteStyles(); 
             } catch(e) {}
 
-            try { refreshIcons(); applyLunchPosition(); initClock(); renderTimetable(); setupControls(); applyToolVisibility(); renderBoardColors(); } catch(e) {}
+            try { refreshIcons(); applyLunchPosition(); initClock(); renderTimetable(); setupControls(); applyToolVisibility(); renderBoardColors(); renderTimerWarnToggles(); } catch(e) {}
             // 학사일정(휴업일)을 받아 오면 시간표를 다시 그림 (휴업일이면 '쉬는 날' 표시)
             if (window.schoolCalendar) window.schoolCalendar.refreshToday().then(() => { try { renderTimetable(); } catch(e) {} });
             try { fetchWeatherData(); setInterval(fetchWeatherData, 1800000); } catch(e) {}
@@ -503,6 +512,7 @@ export function startLegacyApp() {
             document.getElementById('select-leave-work-duration').value = leaveWorkPopupDuration;
             
             document.getElementById('toggle-close-outside').checked = closeOnOutsideClick; 
+            if (window.appAutostart) window.appAutostart.refresh();
             document.getElementById('modal-settings').classList.add('active'); 
         }
         
@@ -755,7 +765,7 @@ export function startLegacyApp() {
         }
 
         function openSavedBoards() { renderSavedBoards(); const t = document.getElementById('toggle-notice-autoarchive'); if (t) t.checked = isNoticeAutoArchiveOn(); document.getElementById('modal-saved-list').classList.add('active'); }
-        function renderSavedBoards() { const c = document.getElementById('saved-boards-container'); c.innerHTML = ''; if(savedBoards.length === 0) { c.innerHTML = '<div class="text-center text-slate-500 py-10 font-bold bg-white rounded-xl">저장된 기록이 없습니다.</div>'; return; } savedBoards.forEach(b => { const el = document.createElement('div'); el.className = 'flex items-center justify-between p-5 bg-white border border-slate-200 rounded-2xl hover:border-indigo-300 hover:shadow-md transition cursor-pointer group'; el.innerHTML = `<div class="flex-1 overflow-hidden" onclick="viewSavedBoard(${b.id})"><h4 class="font-bold text-slate-800 text-xl flex items-center mb-1 truncate"><i data-lucide="file-text" class="w-6 h-6 mr-2 text-indigo-500 shrink-0"></i>${b.title}</h4><span class="text-base text-slate-500 font-bold ml-8">${b.date}</span></div><button onclick="deleteSavedBoard(${b.id}, event)" class="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition" title="삭제"><i data-lucide="trash-2" class="w-6 h-6"></i></button>`; c.appendChild(el); }); refreshIcons(); }
+        function renderSavedBoards() { const c = document.getElementById('saved-boards-container'); c.innerHTML = ''; if(savedBoards.length === 0) { c.innerHTML = '<div class="text-center text-slate-500 py-10 font-bold bg-white rounded-xl">저장된 기록이 없습니다.</div>'; return; } savedBoards.forEach(b => { const el = document.createElement('div'); el.className = 'flex items-center justify-between p-5 bg-white border border-slate-200 rounded-2xl hover:border-indigo-300 hover:shadow-md transition cursor-pointer group'; el.innerHTML = `<div class="flex-1 overflow-hidden" onclick="viewSavedBoard(${b.id})"><h4 class="font-bold text-slate-800 text-xl flex items-center mb-1 truncate"><i data-lucide="file-text" class="w-6 h-6 mr-2 text-indigo-500 shrink-0"></i>${escHtml(b.title)}</h4><span class="text-base text-slate-500 font-bold ml-8">${escHtml(b.date)}</span></div><button onclick="deleteSavedBoard(${b.id}, event)" class="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition" title="삭제"><i data-lucide="trash-2" class="w-6 h-6"></i></button>`; c.appendChild(el); }); refreshIcons(); }
         function viewSavedBoard(id) { const b = savedBoards.find(x => x.id === id); if(!b) return; viewingBoardId = id; document.getElementById('viewer-date').innerText = b.date; const vc = document.getElementById('viewer-content'); vc.innerHTML = b.content; if (window.boardImages) window.boardImages.resolveImagesIn(vc); document.getElementById('modal-board-viewer').classList.add('active'); }
         // ---------- 2.7.0: 보관한 기록 다시 불러와 고치기 ----------
         // [판서] 기록은 판서로, [알림] 기록은 알림으로, 그 밖(팝업노트 등)은 지금 화면으로 불러옴.
@@ -805,7 +815,7 @@ export function startLegacyApp() {
         }
 
         function deleteSavedBoard(id, ev) { ev.stopPropagation(); if(confirm('이 기록을 정말 삭제하시겠습니까?')) { savedBoards = savedBoards.filter(b => b.id !== id); storage.setItem('smartBoardSavedData', JSON.stringify(savedBoards)); renderSavedBoards(); } }
-        function applyToolVisibility() { const t = ['picker', 'timer', 'noise', 'attention', 'lunch', 'youtube', 'tinkerbell', 'iscream', 'popupnote', 'activity']; t.forEach(id => { const el = document.getElementById(`btn-tool-${id}`); if(el) el.style.display = (toolVisibility[id] === false) ? 'none' : 'flex'; }); }
+        function applyToolVisibility() { const t = ['picker', 'timer', 'noise', 'attention', 'lunch', 'youtube', 'tinkerbell', 'iscream', 'popupnote', 'qr', 'activity']; t.forEach(id => { const el = document.getElementById(`btn-tool-${id}`); if(el) el.style.display = (toolVisibility[id] === false) ? 'none' : 'flex'; }); }
         
         function updateSubjectFast(idx, el) { 
             const todayStr = new Date().toLocaleDateString();
@@ -877,7 +887,7 @@ export function startLegacyApp() {
                 el.className = `flex items-center px-3 py-2 rounded-2xl border-2 border-slate-200 bg-slate-50 transition-all duration-300 timetable-slot flex-1 min-h-[48px]`; 
                 el.dataset.start = sl.start; 
                 el.dataset.end = sl.end; 
-                el.innerHTML = `<div class="flex items-center flex-1 cursor-pointer hover:bg-slate-200/50 rounded-lg p-1" onclick="toggleMutePeriod(${i})"><div class="flex w-[5.5rem] shrink-0 items-center justify-center relative"><span class="text-2xl font-bold ${m?'text-slate-400':'text-slate-800'} slot-name">${sl.name}</span>${m?'<i data-lucide="bell-off" class="w-4 h-4 text-red-400 absolute -right-2"></i>':''}</div><span class="text-xl font-bold ${m?'text-slate-400 line-through':'text-slate-600'} flex-1 text-center whitespace-nowrap slot-time">${sl.start} - ${sl.end}</span></div><input type="text" value="${s[i]||''}" onchange="updateSubjectFast(${i}, this)" class="text-2xl font-bold px-2 py-1.5 rounded-xl border-2 shrink-0 w-32 text-center shadow-sm outline-none ${getSubjectColorClasses(s[i])} ml-1 slot-subject">`; 
+                el.innerHTML = `<div class="flex items-center flex-1 cursor-pointer hover:bg-slate-200/50 rounded-lg p-1" onclick="toggleMutePeriod(${i})"><div class="flex w-[5.5rem] shrink-0 items-center justify-center relative"><span class="text-2xl font-bold ${m?'text-slate-400':'text-slate-800'} slot-name">${sl.name}</span>${m?'<i data-lucide="bell-off" class="w-4 h-4 text-red-400 absolute -right-2"></i>':''}</div><span class="text-xl font-bold ${m?'text-slate-400 line-through':'text-slate-600'} flex-1 text-center whitespace-nowrap slot-time">${sl.start} - ${sl.end}</span></div><input type="text" value="${escHtml(s[i]||'')}" onchange="updateSubjectFast(${i}, this)" class="text-2xl font-bold px-2 py-1.5 rounded-xl border-2 shrink-0 w-32 text-center shadow-sm outline-none ${getSubjectColorClasses(s[i])} ml-1 slot-subject">`; 
                 c.appendChild(el); 
             }); 
             updateTimetableHighlight(now); 
@@ -1089,7 +1099,7 @@ export function startLegacyApp() {
             timeSlots.forEach((slot, ri) => { 
                 g.innerHTML += `<div class="font-bold text-center flex items-center justify-center bg-slate-50 rounded-lg text-sm">${slot.name}</div>`; 
                 [1,2,3,4,5].forEach(di => { 
-                    g.innerHTML += `<input type="text" id="sched-${di}-${ri}" value="${schedule[di] && schedule[di][ri] ? schedule[di][ri] : ''}" class="w-full text-center p-2 border border-slate-300 rounded-lg font-bold">`; 
+                    g.innerHTML += `<input type="text" id="sched-${di}-${ri}" value="${escHtml(schedule[di] && schedule[di][ri] ? schedule[di][ri] : '')}" class="w-full text-center p-2 border border-slate-300 rounded-lg font-bold">`; 
                 }); 
             }); 
             const l = document.getElementById('settings-time-list'); 
@@ -1194,7 +1204,7 @@ export function startLegacyApp() {
         function openToolSettings() { 
             const mx = document.getElementById('input-max-picker'); 
             if(mx) mx.value = maxPickerNum; 
-            const tools = ['picker', 'timer', 'noise', 'attention', 'lunch', 'youtube', 'tinkerbell', 'iscream', 'popupnote', 'activity']; 
+            const tools = ['picker', 'timer', 'noise', 'attention', 'lunch', 'youtube', 'tinkerbell', 'iscream', 'popupnote', 'qr', 'activity']; 
             tools.forEach(id => { const el = document.getElementById(`toggle-tool-${id}`); if(el) el.checked = toolVisibility[id] !== false; }); 
             renderStudentGrid(); 
             setTempTimetablePos(timetablePos);
@@ -1217,19 +1227,21 @@ export function startLegacyApp() {
 
             for(let i=0; i<35; i++){ const ip = document.getElementById(`student-name-${i}`); if(ip) studentNames[i] = ip.value; } 
             storage.setItem('smartBoardStudentNames', JSON.stringify(studentNames)); 
-            const tools = ['picker', 'timer', 'noise', 'attention', 'lunch', 'youtube', 'tinkerbell', 'iscream', 'popupnote', 'activity']; 
+            const tools = ['picker', 'timer', 'noise', 'attention', 'lunch', 'youtube', 'tinkerbell', 'iscream', 'popupnote', 'qr', 'activity']; 
             tools.forEach(id => { const el = document.getElementById(`toggle-tool-${id}`); if(el) toolVisibility[id] = el.checked; }); 
             storage.setItem('smartBoardToolVisibility', JSON.stringify(toolVisibility)); 
             applyToolVisibility(); 
             closeModal('modal-tool-settings'); 
         }
 
-        function renderStudentGrid() { const c = document.getElementById('student-list-container'); c.innerHTML = studentNames.map((n, i) => `<div class="flex items-center bg-white border rounded-lg overflow-hidden"><div class="bg-slate-100 px-2 py-1 font-bold w-10 text-center border-r text-sm">${i+1}</div><input type="text" id="student-name-${i}" value="${n}" class="w-full px-2 py-1 outline-none text-base font-bold" onpaste="handleStudentPaste(event, ${i})"></div>`).join(''); }
+        function renderStudentGrid() { const c = document.getElementById('student-list-container'); c.innerHTML = studentNames.map((n, i) => `<div class="flex items-center bg-white border rounded-lg overflow-hidden"><div class="bg-slate-100 px-2 py-1 font-bold w-10 text-center border-r text-sm">${i+1}</div><input type="text" id="student-name-${i}" value="${escHtml(n)}" class="w-full px-2 py-1 outline-none text-base font-bold" onpaste="handleStudentPaste(event, ${i})"></div>`).join(''); }
         function handleStudentPaste(e, idx) { e.preventDefault(); const names = e.clipboardData.getData('text').split(/[\r\n\t]+/).filter(n => n.trim()); names.forEach((n, i) => { if(idx+i < 35) document.getElementById(`student-name-${idx+i}`).value = n.trim(); }); }
         function clearStudentNames() { if(confirm('입력된 학생 명렬표를 초기화하시겠습니까?')) { studentNames = Array(35).fill(''); storage.setItem('smartBoardStudentNames', JSON.stringify(studentNames)); renderStudentGrid(); } }
 
-        function adjustTimerTime(s) { timerRemaining += s; if (timerRemaining < 0) timerRemaining = 0; if (isTimerRunning) timerEndAt = Date.now() + timerRemaining * 1000; updateTimerDisplay(); }
-        function addTimerTime(s) { timerRemaining += s; if (isTimerRunning) timerEndAt = Date.now() + timerRemaining * 1000; updateTimerDisplay(); }
+        // 시간을 더하면 진행 막대의 전체 시간도 같이 늘어남 (시작 전이면 남은 시간이 곧 전체 시간)
+        function adjustTimerTime(s) { syncTimerRemaining(); timerRemaining += s; if (timerRemaining < 0) timerRemaining = 0; timerTotal = Math.max(timerRemaining, timerTotal + s); if (isTimerRunning) timerEndAt = Date.now() + timerRemaining * 1000; updateTimerDisplay(); }
+        function addTimerTime(s) { syncTimerRemaining(); timerRemaining += s; timerTotal = Math.max(timerRemaining, timerTotal + s); if (isTimerRunning) timerEndAt = Date.now() + timerRemaining * 1000; updateTimerDisplay(); }
+        function syncTimerRemaining() { if (isTimerRunning) timerRemaining = Math.max(0, Math.ceil((timerEndAt - Date.now()) / 1000)); }
         function toggleTimer() {
             const btn = document.getElementById('btn-timer-toggle');
             if (isTimerRunning) { 
@@ -1239,6 +1251,7 @@ export function startLegacyApp() {
                 updateTimerDisplay();
             } else { 
                 if (timerRemaining <= 0) return; 
+                if (timerTotal < timerRemaining) timerTotal = timerRemaining;
                 timerEndAt = Date.now() + timerRemaining * 1000;
                 isTimerRunning = true; btn.innerText = '정지'; 
                 btn.classList.replace('bg-blue-600', 'bg-yellow-500'); btn.classList.replace('hover:bg-blue-700', 'hover:bg-yellow-600'); 
@@ -1249,13 +1262,47 @@ export function startLegacyApp() {
             if (!isTimerRunning) return;
             timerRemaining = Math.max(0, Math.ceil((timerEndAt - Date.now()) / 1000));
             updateTimerDisplay();
+            checkTimerWarnings();
             if (timerRemaining <= 0) {
                 resetTimer(); playAttentionBell();
                 showAlarm("타이머 종료", "시간이 다 되었습니다!", false, "타이머가 종료되었습니다.", true);
             }
         }
-        function resetTimer() { isTimerRunning = false; timerEndAt = 0; timerRemaining = 0; updateTimerDisplay(); const btn = document.getElementById('btn-timer-toggle'); btn.innerText = '시작'; btn.classList.replace('bg-yellow-500', 'bg-blue-600'); btn.classList.replace('hover:bg-yellow-600', 'hover:bg-blue-700'); }
-        function updateTimerDisplay() { const m = Math.floor(timerRemaining / 60); const s = timerRemaining % 60; const d = document.getElementById('timer-display'); if(d) d.innerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`; }
+        function resetTimer() { isTimerRunning = false; timerEndAt = 0; timerRemaining = 0; timerTotal = 0; timerWarned = {}; updateTimerDisplay(); const btn = document.getElementById('btn-timer-toggle'); btn.innerText = '시작'; btn.classList.replace('bg-yellow-500', 'bg-blue-600'); btn.classList.replace('hover:bg-yellow-600', 'hover:bg-blue-700'); }
+        function updateTimerDisplay() {
+            const m = Math.floor(timerRemaining / 60); const s = timerRemaining % 60; const d = document.getElementById('timer-display'); if(d) d.innerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            // 진행 막대: 남은 비율만큼, 절반 이하 노랑 · 20% 이하 빨강
+            const bar = document.getElementById('timer-progress');
+            if (bar) {
+                const r = timerTotal > 0 ? Math.max(0, Math.min(1, timerRemaining / timerTotal)) : 0;
+                bar.style.width = (r * 100).toFixed(1) + '%';
+                bar.className = `h-full rounded-full transition-all duration-700 ${r > 0.5 ? 'bg-blue-500' : (r > 0.2 ? 'bg-amber-400' : 'bg-red-500')}`;
+            }
+        }
+        // ---------- 2.8.0: 타이머 미리 알림 (5·3·1분 전) ----------
+        // 남은 시간이 그 분을 지나는 순간 한 번: 짧은 종 + "N분 남았습니다" + 타이머 창에 표시.
+        // 그 분보다 짧게 맞춘 타이머에서는 울리지 않음. 시간을 더해 다시 그 위로 올라가면 다시 울릴 수 있음.
+        function checkTimerWarnings() {
+            const crossed = [];
+            [5, 3, 1].forEach(min => {
+                const t = min * 60;
+                if (timerRemaining > t) { delete timerWarned[min]; return; }
+                if (timerWarned[min] || timerRemaining <= 0 || timerTotal <= t) return;
+                timerWarned[min] = true;
+                if (timerWarn[min]) crossed.push(min);
+            });
+            if (crossed.length) announceTimerLeft(Math.min(...crossed)); // 절전 등으로 한꺼번에 지났으면 가장 가까운 것만
+        }
+        function announceTimerLeft(min) {
+            const msg = document.getElementById('timer-warn-msg');
+            if (msg) { msg.innerText = `${min}분 남았어요!`; msg.classList.remove('hidden'); clearTimeout(msg._t); msg._t = setTimeout(() => msg.classList.add('hidden'), 6000); }
+            const d = document.getElementById('timer-display');
+            if (d) { d.classList.add('animate-pulse', 'text-red-500'); setTimeout(() => d.classList.remove('animate-pulse', 'text-red-500'), 6000); }
+            playAttentionBell();
+            setTimeout(() => playTTS(`${min}분 남았습니다.`), 1200);
+        }
+        function setTimerWarn(min, on) { timerWarn[min] = !!on; storage.setItem('smartBoardTimerWarn', JSON.stringify(timerWarn)); }
+        function renderTimerWarnToggles() { [5, 3, 1].forEach(min => { const el = document.getElementById(`timer-warn-${min}`); if (el) el.checked = timerWarn[min] !== false; }); }
         
         function pickRandomNumber() {
             try {
@@ -1268,7 +1315,7 @@ export function startLegacyApp() {
                 el.classList.add('animate-pop-in');
                 
                 if (name && name.trim() !== '') {
-                    el.innerHTML = `<div class="text-4xl text-purple-500 font-bold mb-4">${res}번</div><div class="text-7xl font-bold">${name}</div>`;
+                    el.innerHTML = `<div class="text-4xl text-purple-500 font-bold mb-4">${res}번</div><div class="text-7xl font-bold">${escHtml(name)}</div>`;
                 } else {
                     el.innerHTML = `<div class="text-[9rem] font-bold text-purple-600">${res}</div>`;
                 }
@@ -1628,6 +1675,7 @@ Object.assign(window, {
     clearStudentNames,
     adjustTimerTime,
     addTimerTime,
+    setTimerWarn,
     toggleTimer,
     resetTimer,
     updateTimerDisplay,

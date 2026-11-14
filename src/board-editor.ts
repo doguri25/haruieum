@@ -76,6 +76,9 @@ const MAX_IMAGE_WIDTH = 1024;
 // 윈도우에 HEIF 확장이 없으면 .heic 파일의 형식(type)이 빈 문자열로 오므로 확장자도 함께 봄
 const IMAGE_EXT = /\.(jpe?g|jfif|png|gif|webp|bmp|avif|svg|heic|heif)$/i;
 const isImageFile = (f: File) => f.type.startsWith("image/") || IMAGE_EXT.test(f.name);
+const isGif = (f: File) => f.type === "image/gif" || /\.gif$/i.test(f.name);
+/** 이보다 큰 GIF 는 움직임 없이 줄여서 넣음 (저장 파일이 너무 커지지 않게) */
+const MAX_GIF_BYTES = 10 * 1024 * 1024;
 const isHeicName = (f: File) => /^image\/hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name);
 /** 이름은 .jpg 여도 내용이 HEIC 인 경우가 있어 파일 머리(ftyp 상자)도 확인 */
 async function sniffHeic(f: Blob): Promise<boolean> {
@@ -324,13 +327,19 @@ class BoardEditor {
       let w = img.naturalWidth, h = img.naturalHeight;
       if (!w || !h) { alert(BROKEN_MSG); return; }
       if (w > MAX_IMAGE_WIDTH) { h = Math.round((h * MAX_IMAGE_WIDTH) / w); w = MAX_IMAGE_WIDTH; }
-      const canvas = document.createElement("canvas");
-      canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
-      ctx.drawImage(img, 0, 0, w, h);
-      // JPEG 는 원래 투명한 곳이 없으므로 검사하지 않음
-      const keepPng = source.type !== "image/jpeg" && hasTransparency(ctx, w, h);
-      const blob = await canvasToBlob(canvas, keepPng ? "image/png" : "image/jpeg", 0.8);
+      let blob: Blob;
+      if (isGif(file) && file.size <= MAX_GIF_BYTES) {
+        // 2.8.0: GIF 는 원본 그대로 (캔버스를 거치면 첫 장면만 남아 움직이지 않았음)
+        blob = file.type === "image/gif" ? file : new Blob([file], { type: "image/gif" });
+      } else {
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+        ctx.drawImage(img, 0, 0, w, h);
+        // JPEG 는 원래 투명한 곳이 없으므로 검사하지 않음
+        const keepPng = source.type !== "image/jpeg" && hasTransparency(ctx, w, h);
+        blob = await canvasToBlob(canvas, keepPng ? "image/png" : "image/jpeg", 0.8);
+      }
 
       let stored;
       try { stored = await storeImage(blob); }
@@ -350,6 +359,20 @@ class BoardEditor {
     }
   }
 
+  /** 이미 다 만든 그림(QR 코드 등)을 다시 압축하지 않고 그대로 넣음. width 는 처음 보이는 너비(px) */
+  async insertPreparedImage(blob: Blob, width: number, alt = "판서 사진"): Promise<void> {
+    const img = await decodeImage(blob);
+    if (!img) { alert(BROKEN_MSG); return; }
+    let stored;
+    try { stored = await storeImage(blob); }
+    catch (e) { console.error("사진 저장 실패:", e); alert("사진을 저장하지 못했습니다: " + e); return; }
+    const height = Math.round((width * img.naturalHeight) / img.naturalWidth);
+    const at = Math.min(this.editor.state.selection.to, this.editor.state.doc.content.size);
+    this.editor.chain().focus().setTextSelection(at)
+      .insertContent({ type: "image", attrs: { src: stored.src, file: stored.file, alt, width, height } })
+      .run();
+  }
+
   /** 선택한 사진을 시계 방향으로 90° 회전 (사진 자체를 돌려서 새 파일로 저장) */
   async rotateImage() {
     const sel = this.selectedImage();
@@ -366,7 +389,7 @@ class BoardEditor {
       ctx.translate(canvas.width, 0);
       ctx.rotate(Math.PI / 2);
       ctx.drawImage(img, 0, 0);
-      const png = blob.type === "image/png";
+      const png = blob.type !== "image/jpeg"; // PNG·GIF 는 투명한 곳이 있을 수 있어 PNG 로
       const stored = await storeImage(await canvasToBlob(canvas, png ? "image/png" : "image/jpeg", 0.92));
       // 기다리는 동안 내용이 바뀌었으면(사진을 지웠거나 옮김) 그만둠
       const cur = this.editor.state.doc.nodeAt(pos);

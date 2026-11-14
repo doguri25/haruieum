@@ -213,6 +213,8 @@ export function worstDustGrade(pm10: number | null | undefined, pm25: number | n
   return b.rank > a.rank ? b : a;
 }
 const el = (id: string) => document.getElementById(id);
+// 2.8.0: 오류 문구는 서버 응답 일부가 들어갈 수 있어(학교망 차단 페이지 등) 글자로만 보이게
+const escHtml = (v: string) => v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 const icons = () => window.lucide?.createIcons();
 
 function setHeader(iconHtml: string, text: string) {
@@ -261,7 +263,7 @@ function renderModal(r: Region) {
     return;
   }
   if (!lastWeather) {
-    box.innerHTML = `<div class="text-center py-8"><i data-lucide="alert-circle" class="w-12 h-12 mx-auto text-red-400 mb-3"></i><p class="font-bold text-lg text-slate-700">날씨 정보를 가져오지 못했습니다</p><p class="text-slate-500 mt-2 text-sm break-all">${lastError || ""}</p><button onclick="window.weather.refresh()" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold">다시 시도</button></div>`;
+    box.innerHTML = `<div class="text-center py-8"><i data-lucide="alert-circle" class="w-12 h-12 mx-auto text-red-400 mb-3"></i><p class="font-bold text-lg text-slate-700">날씨 정보를 가져오지 못했습니다</p><p class="text-slate-500 mt-2 text-sm break-all">${escHtml(lastError || "")}</p><button onclick="window.weather.refresh()" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold">다시 시도</button></div>`;
     return;
   }
   const w = lastWeather, c = w.current;
