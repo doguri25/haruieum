@@ -14,8 +14,10 @@ import { TableKit } from "@tiptap/extension-table";
 import Image from "@tiptap/extension-image";
 import { Placeholder } from "@tiptap/extensions";
 import { NodeSelection, TextSelection } from "@tiptap/pm/state";
+import { loadImageBlob, resolveImageSrc, storeImage } from "./board-images";
+import { openImageViewer } from "./image-viewer";
 
-// --- 사진 노드: 너비/높이(px)와 정렬 속성 추가 ---------------------------------
+// --- 사진 노드: 너비/높이(px)·정렬·파일 이름 속성 추가 ------------------------------
 const BoardImage = Image.extend({
   addAttributes() {
     const parsePx = (el: HTMLElement, attr: "width" | "height") => {
@@ -27,6 +29,16 @@ const BoardImage = Image.extend({
     };
     return {
       ...this.parent?.(),
+      // 2.6.0: 사진은 data/images 의 파일. src 는 운영체제마다 모양이 달라 읽을 때 data-file 로 다시 만듦
+      src: {
+        default: null,
+        parseHTML: (el: HTMLElement) => resolveImageSrc(el.getAttribute("data-file"), el.getAttribute("src")),
+      },
+      file: {
+        default: null,
+        parseHTML: (el: HTMLElement) => el.getAttribute("data-file"),
+        renderHTML: (attrs: Record<string, unknown>) => (attrs.file ? { "data-file": attrs.file } : {}),
+      },
       width: { default: null, parseHTML: (el: HTMLElement) => parsePx(el, "width") },
       height: { default: null, parseHTML: (el: HTMLElement) => parsePx(el, "height") },
       align: {
@@ -37,6 +49,26 @@ const BoardImage = Image.extend({
       },
     };
   },
+  // TipTap 의 크기 조절 노드뷰는 처음 그릴 때만 width/height 를 화면에 적용하고, 그 뒤 속성이 바뀌어도 그대로 둠.
+  // 그래서 ±10% 버튼(그리고 회전)이 저장값만 바꾸고 화면의 사진 크기는 그대로였음 → 바뀔 때마다 맞춰 줌
+  addNodeView() {
+    const make = this.parent?.();
+    if (!make) return null;
+    return (props) => {
+      const view = make(props) as ReturnType<typeof make> & { element?: HTMLElement };
+      const update = view.update?.bind(view);
+      view.update = (node, decorations, innerDecorations) => {
+        const ok = update ? update(node, decorations, innerDecorations) : true;
+        const img = view.element;
+        if (ok && img && !img.closest("[data-resize-state='true']")) {
+          img.style.width = node.attrs.width ? `${node.attrs.width}px` : "";
+          img.style.height = node.attrs.height ? `${node.attrs.height}px` : "";
+        }
+        return ok;
+      };
+      return view;
+    };
+  },
 });
 
 const MAX_IMAGE_WIDTH = 1024;
@@ -44,11 +76,56 @@ const MAX_IMAGE_WIDTH = 1024;
 // 윈도우에 HEIF 확장이 없으면 .heic 파일의 형식(type)이 빈 문자열로 오므로 확장자도 함께 봄
 const IMAGE_EXT = /\.(jpe?g|jfif|png|gif|webp|bmp|avif|svg|heic|heif)$/i;
 const isImageFile = (f: File) => f.type.startsWith("image/") || IMAGE_EXT.test(f.name);
-const isHeic = (f: File) => /^image\/hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name);
+const isHeicName = (f: File) => /^image\/hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name);
+/** 이름은 .jpg 여도 내용이 HEIC 인 경우가 있어 파일 머리(ftyp 상자)도 확인 */
+async function sniffHeic(f: Blob): Promise<boolean> {
+  const head = new Uint8Array(await f.slice(0, 12).arrayBuffer());
+  const ascii = String.fromCharCode(...head);
+  return ascii.slice(4, 8) === "ftyp" && /^(heic|heix|hevc|hevx|heim|heis|hevm|hevs|mif1|msf1)$/.test(ascii.slice(8, 12));
+}
+/** 아이폰 사진(HEIC) → JPEG. 변환기(약 3MB)는 처음 필요할 때만 불러옴 */
+async function heicToJpeg(f: Blob): Promise<Blob> {
+  const { heicTo } = await import("heic-to");
+  return heicTo({ blob: f, type: "image/jpeg", quality: 0.9 });
+}
 const HEIC_MSG =
-  "아이폰 사진(HEIC 형식)은 앱에서 바로 열 수 없습니다.\n" +
+  "아이폰 사진(HEIC 형식)을 변환하지 못했습니다.\n" +
   "JPG로 바꿔서 넣어 주세요. (아이폰: 설정 → 카메라 → 포맷 → '높은 호환성'으로 찍으면 처음부터 JPG로 저장됩니다)";
-const BROKEN_MSG = "사진을 열 수 없습니다. 파일이 손상됐거나 지원하지 않는 형식입니다. (JPG·PNG·GIF·WEBP 사진을 넣어 주세요)";
+const BROKEN_MSG = "사진을 열 수 없습니다. 파일이 손상됐거나 지원하지 않는 형식입니다. (JPG·PNG·GIF·WEBP·HEIC 사진을 넣어 주세요)";
+
+/** blob → 다 읽힌 <img>. 실패하면 null */
+function decodeImage(blob: Blob): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const img = new window.Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+/** 투명한 부분이 하나라도 있는지 (있으면 JPEG 로 바꾸면 검게 변하므로 PNG 로 둠) */
+function hasTransparency(ctx: CanvasRenderingContext2D, w: number, h: number): boolean {
+  const d = ctx.getImageData(0, 0, w, h).data;
+  for (let i = 3; i < d.length; i += 4) if (d[i] < 255) return true;
+  return false;
+}
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("사진 변환 실패"))), type, quality));
+}
+/** 시간이 걸리는 사진 처리(아이폰 사진 변환 등) 중 화면 아래 안내. 0.3초 안에 끝나면 안 보임 */
+function busyNotice(text: string): () => void {
+  const t = window.setTimeout(() => {
+    let el = document.getElementById("sb-busy");
+    if (!el) { el = document.createElement("div"); el.id = "sb-busy"; document.body.appendChild(el); }
+    el.textContent = text;
+    el.style.display = "block";
+  }, 300);
+  return () => {
+    window.clearTimeout(t);
+    const el = document.getElementById("sb-busy");
+    if (el) el.style.display = "none";
+  };
+}
 
 type UpdateListener = () => void;
 
@@ -220,37 +297,95 @@ class BoardEditor {
     files.forEach((f) => void this.insertImageFile(f));
   }
 
-  /** 파일을 최대 1024px, JPEG 0.8 로 줄여 삽입 (v1 과 같은 규칙).
-   *  열 수 없는 파일(HEIC·손상 등)은 예전엔 아무 반응 없이 끝났으므로, 이유를 알려 줌 */
-  insertImageFile(file: File): Promise<void> {
-    return new Promise((resolve) => {
-      if (!isImageFile(file)) { alert("이미지 파일만 삽입할 수 있습니다."); resolve(); return; }
-      const fail = () => { alert(isHeic(file) ? HEIC_MSG : BROKEN_MSG); resolve(); };
-      const reader = new FileReader();
-      reader.onerror = fail;
-      reader.onload = (e) => {
-        const img = new window.Image();
-        img.onerror = fail;
-        img.onload = () => {
-          let w = img.width, h = img.height;
-          if (w > MAX_IMAGE_WIDTH) { h = Math.round((h * MAX_IMAGE_WIDTH) / w); w = MAX_IMAGE_WIDTH; }
-          const canvas = document.createElement("canvas");
-          canvas.width = w; canvas.height = h;
-          canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-          // 처음 크기: 편집 영역 너비의 절반
-          const editorW = this.editor.view.dom.clientWidth || 800;
-          const width = Math.max(40, Math.min(w, Math.round(editorW * 0.5)));
-          const height = Math.round((width * h) / w);
-          // 글자를 선택한 상태여도 그 글자를 지우지 않도록 선택 끝에 삽입
-          const at = this.editor.state.selection.to;
-          this.editor.chain().focus().setTextSelection(at).setImage({ src: dataUrl, alt: "판서 사진", width, height }).run();
-          resolve();
-        };
-        img.src = e.target!.result as string;
-      };
-      reader.readAsDataURL(file);
-    });
+  /** 파일을 최대 1024px 로 줄여 삽입 (v1 과 같은 규칙). 2.6.0:
+   *  - 아이폰 사진(HEIC)은 JPEG 로 변환해서 넣음
+   *  - 투명한 부분이 있는 사진은 PNG 그대로(예전엔 JPEG 로 바꾸면서 투명한 곳이 검게 변했음), 나머지는 JPEG 0.8
+   *  - 앱에서는 사진을 data/images 의 파일로 저장 (board-images.ts)
+   *  - 열 수 없는 파일은 이유를 알려 줌 (예전엔 아무 반응 없이 끝났음) */
+  async insertImageFile(file: File): Promise<void> {
+    if (!isImageFile(file)) { alert("이미지 파일만 삽입할 수 있습니다."); return; }
+    const done = busyNotice(isHeicName(file) ? "아이폰 사진을 변환하는 중…" : "사진을 넣는 중…");
+    try {
+      let source: Blob = file;
+      let img = isHeicName(file) ? null : await decodeImage(file);
+      if (!img && (isHeicName(file) || (await sniffHeic(file)))) {
+        try { source = await heicToJpeg(file); img = await decodeImage(source); }
+        catch (e) { console.warn("HEIC 변환 실패:", e); alert(HEIC_MSG); return; }
+        if (!img) { alert(HEIC_MSG); return; }
+      }
+      if (!img) { alert(BROKEN_MSG); return; }
+
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if (!w || !h) { alert(BROKEN_MSG); return; }
+      if (w > MAX_IMAGE_WIDTH) { h = Math.round((h * MAX_IMAGE_WIDTH) / w); w = MAX_IMAGE_WIDTH; }
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+      ctx.drawImage(img, 0, 0, w, h);
+      // JPEG 는 원래 투명한 곳이 없으므로 검사하지 않음
+      const keepPng = source.type !== "image/jpeg" && hasTransparency(ctx, w, h);
+      const blob = await canvasToBlob(canvas, keepPng ? "image/png" : "image/jpeg", 0.8);
+
+      let stored;
+      try { stored = await storeImage(blob); }
+      catch (e) { console.error("사진 저장 실패:", e); alert("사진을 저장하지 못했습니다: " + e); return; }
+
+      // 처음 크기: 편집 영역 너비의 절반
+      const editorW = this.editor.view.dom.clientWidth || 800;
+      const width = Math.max(40, Math.min(w, Math.round(editorW * 0.5)));
+      const height = Math.round((width * h) / w);
+      // 글자를 선택한 상태여도 그 글자를 지우지 않도록 선택 끝에 삽입
+      const at = Math.min(this.editor.state.selection.to, this.editor.state.doc.content.size);
+      this.editor.chain().focus().setTextSelection(at)
+        .insertContent({ type: "image", attrs: { src: stored.src, file: stored.file, alt: "판서 사진", width, height } })
+        .run();
+    } finally {
+      done();
+    }
+  }
+
+  /** 선택한 사진을 시계 방향으로 90° 회전 (사진 자체를 돌려서 새 파일로 저장) */
+  async rotateImage() {
+    const sel = this.selectedImage();
+    if (!sel) return;
+    const { pos, node } = sel;
+    const done = busyNotice("사진을 돌리는 중…");
+    try {
+      const blob = await loadImageBlob(node.attrs.file, node.attrs.src);
+      const img = await decodeImage(blob);
+      if (!img) { alert(BROKEN_MSG); return; }
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalHeight; canvas.height = img.naturalWidth;
+      const ctx = canvas.getContext("2d")!;
+      ctx.translate(canvas.width, 0);
+      ctx.rotate(Math.PI / 2);
+      ctx.drawImage(img, 0, 0);
+      const png = blob.type === "image/png";
+      const stored = await storeImage(await canvasToBlob(canvas, png ? "image/png" : "image/jpeg", 0.92));
+      // 기다리는 동안 내용이 바뀌었으면(사진을 지웠거나 옮김) 그만둠
+      const cur = this.editor.state.doc.nodeAt(pos);
+      if (!cur || cur.type.name !== "image" || cur.attrs.src !== node.attrs.src) return;
+      // 보이는 크기는 가로·세로를 바꿈
+      const shown = (this.editor.view.nodeDOM(pos) as HTMLElement | null)?.querySelector("img");
+      const curW = shown?.clientWidth || node.attrs.width || 300;
+      const curH = shown?.clientHeight || node.attrs.height || 200;
+      const tr = this.editor.state.tr.setNodeMarkup(pos, undefined, { ...cur.attrs, src: stored.src, file: stored.file, width: curH, height: curW });
+      tr.setSelection(NodeSelection.create(tr.doc, pos));
+      this.editor.view.dispatch(tr);
+      this.editor.commands.focus();
+      setTimeout(() => this.updateImageToolbar(), 0);
+    } catch (e) {
+      console.error("사진 회전 실패:", e);
+      alert("사진을 돌리지 못했습니다: " + e);
+    } finally {
+      done();
+    }
+  }
+
+  /** 선택한 사진을 화면 가득 보기 */
+  viewImage() {
+    const sel = this.selectedImage();
+    if (sel?.node.attrs.src) openImageViewer(sel.node.attrs.src);
   }
 
   private selectedImage(): { node: any; pos: number } | null {

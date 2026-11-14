@@ -5,6 +5,7 @@
 // 6단계: 1초 tick 이벤트(백그라운드에서도 타이머·알람 정확히), 사이트 창 열기 권한
 // 2.1.0: 자동 업데이트 (check_update / install_update)
 // 2.5.0: 로그인 기억 — WebView2(엣지 엔진)의 비밀번호 저장/자동 채우기 켜기
+// 2.6.0: 판서 사진을 data/images 파일로 (save_image·read_image·cleanup_images, sbimg 프로토콜)
 //
 // 저장 위치: <앱 데이터 폴더>/data/
 //   settings.json, board.json, notice.json, saved-boards.json, popup-note.json
@@ -107,6 +108,143 @@ fn read_alarm_mp3(app: tauri::AppHandle, name: String) -> Result<tauri::ipc::Res
     let path = data_dir(&app)?.join("alarm").join(&name);
     let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
     Ok(tauri::ipc::Response::new(bytes))
+}
+
+// ---------- 2.6.0: 판서·알림 사진을 파일로 ----------
+// 예전에는 사진을 base64 글자로 판서 HTML 안에 넣어서, 보관할 때마다 저장 파일이 커지고 같은 사진이 계속 복사됐음.
+// 이제 사진은 data/images/<내용 SHA-256 앞 32자>.<jpg|png|gif|webp> 로 한 번만 저장하고,
+// HTML 에는 sbimg 프로토콜 주소와 data-file="<파일 이름>" 만 남김. (같은 사진은 같은 이름 → 자동으로 한 장만)
+// 웹뷰 주소: 윈도우 https://sbimg.localhost/<이름>, macOS·리눅스 sbimg://localhost/<이름> (JS 의 convertFileSrc 가 만듦)
+
+fn images_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let dir = data_dir(app)?.join("images");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+/// 사진 파일 이름 규칙: 16진수 32자 + 허용 확장자 (경로 조작·다른 파일 접근 방지)
+fn is_image_name(name: &str) -> bool {
+    let Some((stem, ext)) = name.split_once('.') else { return false };
+    stem.len() == 32
+        && stem.chars().all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c))
+        && matches!(ext, "jpg" | "png" | "gif" | "webp")
+}
+
+fn image_mime(name: &str) -> &'static str {
+    match name.rsplit('.').next() {
+        Some("png") => "image/png",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        _ => "image/jpeg",
+    }
+}
+
+/// 사진 저장. 본문은 사진 바이트 그대로(raw), 파일 이름은 x-image-name 머리글로 받음.
+/// 같은 이름이 이미 있으면(같은 내용) 다시 쓰지 않음.
+#[tauri::command]
+fn save_image(app: tauri::AppHandle, request: tauri::ipc::Request<'_>) -> Result<(), String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("사진 데이터 형식이 올바르지 않습니다".into());
+    };
+    let name = request
+        .headers()
+        .get("x-image-name")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default();
+    if !is_image_name(name) {
+        return Err(format!("잘못된 사진 이름: {name}"));
+    }
+    if bytes.is_empty() {
+        return Err("빈 사진입니다".into());
+    }
+    let dir = images_dir(&app)?;
+    let path = dir.join(name);
+    if path.exists() {
+        return Ok(());
+    }
+    let tmp = dir.join(format!("{name}.tmp"));
+    {
+        let mut f = std::fs::File::create(&tmp).map_err(|e| e.to_string())?;
+        f.write_all(bytes).map_err(|e| e.to_string())?;
+        f.sync_all().map_err(|e| e.to_string())?;
+    }
+    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// 사진 바이트를 그대로 돌려줌 (회전처럼 픽셀을 다시 그릴 때. 프로토콜 주소를 캔버스에 그리면 출처 제한에 걸릴 수 있어서)
+#[tauri::command]
+fn read_image(app: tauri::AppHandle, name: String) -> Result<tauri::ipc::Response, String> {
+    if !is_image_name(&name) {
+        return Err(format!("잘못된 사진 이름: {name}"));
+    }
+    let bytes = std::fs::read(images_dir(&app)?.join(&name)).map_err(|e| e.to_string())?;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
+/// 어느 저장 내용에서도 쓰지 않는 사진 파일 중 grace_days 일이 지난 것을 지움 (시작할 때 JS 가 호출).
+/// keep: 지금 저장 내용 전체에서 찾은 사진 이름들. 지운 개수를 돌려줌.
+#[tauri::command]
+fn cleanup_images(app: tauri::AppHandle, keep: Vec<String>, grace_days: u64) -> Result<u32, String> {
+    let keep: std::collections::HashSet<String> = keep.into_iter().collect();
+    let grace = std::time::Duration::from_secs(grace_days * 24 * 60 * 60);
+    let now = std::time::SystemTime::now();
+    let mut removed = 0;
+    for entry in std::fs::read_dir(images_dir(&app)?).map_err(|e| e.to_string())? {
+        let Ok(entry) = entry else { continue };
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !is_image_name(&name) || keep.contains(&name) {
+            continue; // 규칙에 안 맞는 파일은 건드리지 않음
+        }
+        let old_enough = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| now.duration_since(t).ok())
+            .is_some_and(|age| age >= grace);
+        if old_enough && std::fs::remove_file(entry.path()).is_ok() {
+            removed += 1;
+        }
+    }
+    Ok(removed)
+}
+
+/// <name>.json 을 <name>.<tag>.json 으로 한 번만 복사해 둠 (이미 있으면 그대로). 사진을 파일로 옮기기 전 원본 보관용
+#[tauri::command]
+fn snapshot_store_once(app: tauri::AppHandle, name: String, tag: String) -> Result<(), String> {
+    check_store_name(&name)?;
+    check_store_name(&tag)?;
+    let dir = data_dir(&app)?;
+    let src = dir.join(format!("{name}.json"));
+    let dest = dir.join(format!("{name}.{tag}.json"));
+    if src.exists() && !dest.exists() {
+        std::fs::copy(&src, &dest).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// sbimg 프로토콜: data/images/<이름> 을 웹뷰에 보내 줌. 이름이 내용의 해시라 바뀌지 않으므로 오래 캐시
+fn serve_image(app: &tauri::AppHandle, request: &tauri::http::Request<Vec<u8>>) -> tauri::http::Response<Vec<u8>> {
+    let name = request.uri().path().trim_start_matches('/');
+    let builder = tauri::http::Response::builder().header("Access-Control-Allow-Origin", "*");
+    let (status, mime, body) = if !is_image_name(name) {
+        (400, "text/plain", b"bad image name".to_vec())
+    } else {
+        match images_dir(app).and_then(|d| std::fs::read(d.join(name)).map_err(|e| e.to_string())) {
+            Ok(bytes) => (200, image_mime(name), bytes),
+            Err(_) => (404, "text/plain", b"not found".to_vec()),
+        }
+    };
+    let builder = if status == 200 {
+        builder.header("Cache-Control", "public, max-age=31536000, immutable")
+    } else {
+        builder
+    };
+    builder
+        .status(status)
+        .header("Content-Type", mime)
+        .body(body)
+        .unwrap_or_else(|_| tauri::http::Response::new(Vec::new()))
 }
 
 /// v1(일렉트론) 앱이 남긴 저장 파일 내용. 없으면 빈 문자열.
@@ -252,10 +390,16 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(login_memory_plugin())
+        // 2.6.0: 판서 사진 파일 (data/images) 을 웹뷰에 보여 주는 주소
+        .register_uri_scheme_protocol("sbimg", |ctx, request| serve_image(ctx.app_handle(), &request))
         .invoke_handler(tauri::generate_handler![
             load_store,
             load_store_backup,
             save_store,
+            save_image,
+            read_image,
+            cleanup_images,
+            snapshot_store_once,
             import_alarm_mp3,
             read_alarm_mp3,
             load_v1_data,

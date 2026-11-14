@@ -262,6 +262,9 @@
                     <button onclick="boardEditor.scaleImage(0.9)" class="p-2.5 bg-slate-50 hover:bg-indigo-50 rounded-xl text-slate-700 hover:text-indigo-600 transition" title="10% 작게"><i data-lucide="zoom-out" class="w-5 h-5 pointer-events-none"></i></button>
                     <button onclick="boardEditor.scaleImage(1.1)" class="p-2.5 bg-slate-50 hover:bg-indigo-50 rounded-xl text-slate-700 hover:text-indigo-600 transition" title="10% 크게"><i data-lucide="zoom-in" class="w-5 h-5 pointer-events-none"></i></button>
                     <div class="w-px h-4 bg-slate-200 mx-1"></div>
+                    <button onclick="boardEditor.rotateImage()" class="p-2.5 hover:bg-indigo-50 rounded-xl text-slate-700 hover:text-indigo-600 transition" title="오른쪽으로 90° 돌리기"><i data-lucide="rotate-cw" class="w-5 h-5 pointer-events-none"></i></button>
+                    <button onclick="boardEditor.viewImage()" class="p-2.5 hover:bg-indigo-50 rounded-xl text-slate-700 hover:text-indigo-600 transition" title="크게 보기 (사진을 두 번 눌러도 됩니다)"><i data-lucide="maximize-2" class="w-5 h-5 pointer-events-none"></i></button>
+                    <div class="w-px h-4 bg-slate-200 mx-1"></div>
                     <button onclick="boardEditor.deleteImage()" class="p-2.5 bg-rose-50 hover:bg-rose-100 rounded-xl text-rose-600 transition" title="사진 삭제"><i data-lucide="trash-2" class="w-5 h-5 pointer-events-none"></i></button>
                     <button onclick="boardEditor.deselect()" class="p-2.5 text-slate-400 hover:bg-slate-100 rounded-xl transition" title="닫기"><i data-lucide="x" class="w-5 h-5 pointer-events-none"></i></button>
                 </div><div id="btn-tool-activity" class="absolute bottom-8 left-8 flex flex-col-reverse items-start gap-3 z-[150]">

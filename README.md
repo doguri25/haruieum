@@ -2,7 +2,7 @@
 
 기존 일렉트론 버전(v1.6.11)을 Tauri 2 + Vite + TypeScript로 옮기는 프로젝트입니다.
 
-## 현재 상태: v2.5.3
+## 현재 상태: v2.6.0
 - 1단계: Tauri 창에서 기존 앱 실행
 - 2단계:
   - 인라인 스크립트 → `src/legacy-app.js` 로 분리 (기능 변경 없음)
@@ -99,13 +99,27 @@
     환경설정의 주소 칸은 비워 두면 기본값을 씀
   - `.github/workflows/build-windows.yml`: main 에 push 된 버전의 릴리스가 없으면 윈도우 러너에서 빌드 → 릴리스 생성 → setup.exe / .sig / latest.json 게시 (tauri-action).
     릴리스 본문은 `scripts/release-notes.mjs` 가 changelog 에서 만듦
-- v2.5.3 (지금): 판서·알림 사진 넣기 수정
+- v2.5.3: 판서·알림 사진 넣기 수정
   - 윈도우 앱에서 사진을 끌어다 놓아도 반응이 없던 문제: Tauri 2 는 창 설정 `dragDropEnabled` 기본값이 true 라 파일 놓기를 Tauri 가 가로채고,
     윈도우(WebView2)에서는 웹 화면에 HTML5 `drop` 이벤트가 오지 않음. 메인 창에 `"dragDropEnabled": false` (`src-tauri/tauri.conf.json`)
   - 그 대신 편집 영역 밖에 파일을 놓으면 웹뷰가 그 파일을 열어 앱 화면이 사라지므로, 창 전체의 파일 dragover/drop 기본 동작을 막음.
     편집 영역(`#notepad-editor`)은 글자 영역 바깥 여백에 놓아도 사진이 들어감 (`src/board-editor.ts` insertDroppedFiles)
   - 열 수 없는 사진(아이폰 HEIC, 손상된 파일)은 `img.onload` 가 오지 않아 조용히 끝났음 → `onerror` 에서 이유를 안내.
     윈도우에 HEIF 확장이 없으면 .heic 의 형식(type)이 비어 오므로 확장자로도 사진 여부를 판단
+- v2.6.0 (지금): 사진 기능 강화
+  - **사진을 파일로 저장** (`src/board-images.ts`, Rust `save_image`/`read_image`/`cleanup_images`/`snapshot_store_once`, `sbimg` 프로토콜):
+    - 사진은 `data/images/<내용 SHA-256 앞 32자>.<jpg|png|gif|webp>` 에 한 번만 저장 (같은 사진은 같은 이름 → 한 장). 바이트는 invoke 원시 본문 + `x-image-name` 머리글로 보냄
+    - HTML 에는 `<img src="sbimg 주소" data-file="이름">`. 주소는 `convertFileSrc(이름, "sbimg")` — 윈도우 `https://sbimg.localhost/…`(useHttpsScheme), macOS·리눅스 `sbimg://localhost/…`.
+      운영체제마다 다르므로 읽을 때 `data-file` 로 다시 만듦 (`BoardImage` 의 src parseHTML, 보관 기록 보기는 `resolveImagesIn`)
+    - 시작할 때 판서·알림·보관 목록의 예전 base64 사진을 파일로 옮김. 옮기기 전 원본은 `<저장소>.before-images.json` 으로 한 번 보관
+    - 시작 30초 뒤, 어떤 저장 내용에도 없는 사진 파일 중 7일 지난 것을 지움 (규칙에 맞는 이름만)
+    - 브라우저(`npm run dev`)에서는 예전처럼 data URL
+  - **아이폰 사진(HEIC) 자동 변환**: `heic-to`(libheif wasm, LGPL-3.0, 약 3MB)를 처음 필요할 때만 불러옴(별도 청크). 이름이 .jpg 여도 파일 머리(ftyp)가 HEIC 면 변환
+  - **투명 PNG 유지**: 그린 뒤 투명 픽셀이 있으면 PNG, 없으면 JPEG 0.8 (예전엔 모두 JPEG 라 투명한 곳이 검게 변했음)
+  - **사진 90° 돌리기·크게 보기** (`src/image-viewer.ts`): 돌리기는 원본 바이트(`read_image`)를 캔버스에서 돌려 새 파일로 저장(되돌리기 가능).
+    크게 보기는 사진 도구 버튼 또는 사진 두 번 누르기(판서·알림·보관 기록 보기), 누르거나 ESC 로 닫힘
+  - **±10% 버튼 버그**: TipTap 크기 조절 노드뷰는 처음 그릴 때만 width/height 를 화면에 적용해서, 속성이 바뀌어도 화면 크기는 그대로였음 →
+    `BoardImage.addNodeView` 에서 update 때마다 맞춤
 
 ## 개발 PC 준비 (macOS, 한 번만)
 ```bash

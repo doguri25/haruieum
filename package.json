@@ -1,7 +1,7 @@
 {
   "name": "smartboard-v2",
   "private": true,
-  "version": "2.5.3",
+  "version": "2.6.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -28,6 +28,7 @@
     "@tiptap/extensions": "^3.31.3",
     "@tiptap/pm": "^3.31.3",
     "@tiptap/starter-kit": "^3.31.3",
+    "heic-to": "1.6.7",
     "lucide": "^1.48.0"
   },
   "devDependencies": {

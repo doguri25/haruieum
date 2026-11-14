@@ -19,6 +19,7 @@ import { initSkins } from "./skins";
 import { initUpdater } from "./updater";
 import { renderVersionModal } from "./version";
 import "./board-editor"; // window.boardEditor (legacy-app.js 와 HTML 버튼이 사용)
+import { cleanupUnusedImages, migrateStoredImages } from "./board-images"; // 판서 사진 파일 (2.6.0)
 import "./weather";      // window.weather (기상청·에어코리아)
 import "./youtube";      // window.youtubeUI (유튜브 검색·재생)
 import "./lunch";        // window.lunch (급식·알레르기)
@@ -111,6 +112,8 @@ async function installCloseFlush() {
 async function boot() {
   storage.onError = showToast;
   await storage.init();
+  // 예전 base64 사진을 파일로 옮김 (편집기가 내용을 읽기 전에). 실패해도 사진은 그대로 남으므로 앱은 계속 띄움
+  try { await migrateStoredImages(); } catch (e) { console.error("사진 파일 옮기기 실패:", e); }
   if (document.readyState === "loading") {
     await new Promise<void>((r) => document.addEventListener("DOMContentLoaded", () => r(), { once: true }));
   }
@@ -122,6 +125,8 @@ async function boot() {
   initUpdater();        // 자동 업데이트 확인
   void preloadAlarm(storage.getItem("smartBoardCustomMp3") || "");
   void installCloseFlush();
+  // 쓰지 않는 사진 파일 정리는 시작이 끝나고 조금 뒤에
+  window.setTimeout(() => { cleanupUnusedImages().catch((e) => console.warn("사진 정리 실패:", e)); }, 30_000);
   console.log("smartboard v2 loaded", isTauri() ? "(tauri)" : "(browser)");
 }
 void boot();
