@@ -379,7 +379,8 @@ export function startLegacyApp() {
         }
 
         function processAndInsertImage(file) {
-            if (!file || !file.type.startsWith('image/')) { alert('이미지 파일만 삽입할 수 있습니다.'); return; }
+            if (!file) return;
+            // 형식 확인·안내는 편집기가 함 (형식 정보가 빈 .heic 도 알맞은 안내를 받도록)
             boardEditor.insertImageFile(file);
         }
 

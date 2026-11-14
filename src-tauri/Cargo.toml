@@ -1,6 +1,6 @@
 [package]
 name = "smartboard-v2"
-version = "2.5.2"
+version = "2.5.3"
 description = "학교 전자칠판용 스마트 보드 (하루이음)"
 authors = ["도구리"]
 edition = "2021"

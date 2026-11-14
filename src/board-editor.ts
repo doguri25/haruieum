@@ -41,6 +41,15 @@ const BoardImage = Image.extend({
 
 const MAX_IMAGE_WIDTH = 1024;
 
+// 윈도우에 HEIF 확장이 없으면 .heic 파일의 형식(type)이 빈 문자열로 오므로 확장자도 함께 봄
+const IMAGE_EXT = /\.(jpe?g|jfif|png|gif|webp|bmp|avif|svg|heic|heif)$/i;
+const isImageFile = (f: File) => f.type.startsWith("image/") || IMAGE_EXT.test(f.name);
+const isHeic = (f: File) => /^image\/hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name);
+const HEIC_MSG =
+  "아이폰 사진(HEIC 형식)은 앱에서 바로 열 수 없습니다.\n" +
+  "JPG로 바꿔서 넣어 주세요. (아이폰: 설정 → 카메라 → 포맷 → '높은 호환성'으로 찍으면 처음부터 JPG로 저장됩니다)";
+const BROKEN_MSG = "사진을 열 수 없습니다. 파일이 손상됐거나 지원하지 않는 형식입니다. (JPG·PNG·GIF·WEBP 사진을 넣어 주세요)";
+
 type UpdateListener = () => void;
 
 class BoardEditor {
@@ -79,10 +88,10 @@ class BoardEditor {
       editorProps: {
         attributes: { class: "sb-rich" },
         handleDrop: (_view, event, _slice, moved) => {
-          const files = Array.from(event.dataTransfer?.files ?? []).filter((f) => f.type.startsWith("image/"));
-          if (moved || files.length === 0) return false;
+          const dropped = Array.from(event.dataTransfer?.files ?? []);
+          if (moved || dropped.length === 0) return false;
           event.preventDefault();
-          files.forEach((f) => void this.insertImageFile(f));
+          this.insertDroppedFiles(dropped);
           return true;
         },
         handlePaste: (_view, event) => {
@@ -99,10 +108,28 @@ class BoardEditor {
       onBlur: () => setTimeout(() => this.updateImageToolbar(), 150),
     });
 
-    // 사진 드롭 안내 표시
-    container.addEventListener("dragover", (e) => { if (e.dataTransfer?.types.includes("Files")) container.classList.add("dragover"); });
+    // 사진 끌어다 놓기. 윈도우 앱에서는 tauri.conf.json 의 dragDropEnabled:false 가 있어야 이 이벤트들이 옴
+    // (기본값 true 면 Tauri 가 파일 놓기를 가로채서 아무 반응이 없었음)
+    const isFileDrag = (e: DragEvent) => !!e.dataTransfer?.types.includes("Files");
+    container.addEventListener("dragover", (e) => {
+      if (!isFileDrag(e)) return;
+      e.preventDefault(); // 글자 영역 바깥 여백에 놓아도 받음
+      container.classList.add("dragover");
+    });
     container.addEventListener("dragleave", () => container.classList.remove("dragover"));
-    container.addEventListener("drop", () => container.classList.remove("dragover"));
+    container.addEventListener("drop", (e) => {
+      container.classList.remove("dragover");
+      if (e.defaultPrevented || !isFileDrag(e)) return; // 글자 영역에 놓은 것은 handleDrop 이 이미 처리
+      e.preventDefault();
+      this.insertDroppedFiles(Array.from(e.dataTransfer!.files));
+    });
+    // 편집기 밖에 파일을 떨어뜨리면 웹뷰가 그 파일을 열면서 앱 화면이 사라짐 → 막음
+    window.addEventListener("dragover", (e) => {
+      if (!isFileDrag(e) || e.defaultPrevented) return;
+      e.preventDefault();
+      e.dataTransfer!.dropEffect = "none";
+    });
+    window.addEventListener("drop", (e) => { if (isFileDrag(e)) e.preventDefault(); });
     // 스크롤하면 사진 도구 위치 갱신
     container.addEventListener("scroll", () => this.updateImageToolbar());
     // 편집기 안에서의 직접 조작(클릭·키 입력)만 기억한 선택 범위를 지우게 함
@@ -187,13 +214,23 @@ class BoardEditor {
   }
 
   // ---------- 사진 ----------
-  /** 파일을 최대 1024px, JPEG 0.8 로 줄여 삽입 (v1 과 같은 규칙) */
+  private insertDroppedFiles(dropped: File[]) {
+    const files = dropped.filter(isImageFile);
+    if (files.length === 0) { alert("이미지 파일만 삽입할 수 있습니다."); return; }
+    files.forEach((f) => void this.insertImageFile(f));
+  }
+
+  /** 파일을 최대 1024px, JPEG 0.8 로 줄여 삽입 (v1 과 같은 규칙).
+   *  열 수 없는 파일(HEIC·손상 등)은 예전엔 아무 반응 없이 끝났으므로, 이유를 알려 줌 */
   insertImageFile(file: File): Promise<void> {
     return new Promise((resolve) => {
-      if (!file.type.startsWith("image/")) { alert("이미지 파일만 삽입할 수 있습니다."); resolve(); return; }
+      if (!isImageFile(file)) { alert("이미지 파일만 삽입할 수 있습니다."); resolve(); return; }
+      const fail = () => { alert(isHeic(file) ? HEIC_MSG : BROKEN_MSG); resolve(); };
       const reader = new FileReader();
+      reader.onerror = fail;
       reader.onload = (e) => {
         const img = new window.Image();
+        img.onerror = fail;
         img.onload = () => {
           let w = img.width, h = img.height;
           if (w > MAX_IMAGE_WIDTH) { h = Math.round((h * MAX_IMAGE_WIDTH) / w); w = MAX_IMAGE_WIDTH; }

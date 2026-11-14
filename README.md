@@ -2,7 +2,7 @@
 
 기존 일렉트론 버전(v1.6.11)을 Tauri 2 + Vite + TypeScript로 옮기는 프로젝트입니다.
 
-## 현재 상태: v2.5.2
+## 현재 상태: v2.5.3
 - 1단계: Tauri 창에서 기존 앱 실행
 - 2단계:
   - 인라인 스크립트 → `src/legacy-app.js` 로 분리 (기능 변경 없음)
@@ -94,11 +94,18 @@
 - v2.5.1: 학습 약속 팝업의 크기 조절 손잡이를 다른 창처럼 오른쪽 아래로 (`src/floating.ts` attachResize).
   이 창은 아래·왼쪽 기준으로 놓이므로, 조절하는 동안만 위·왼쪽 고정(`top`/`transform-origin: top left`)으로 바꿔 끄는 방향으로 커지게 하고,
   놓으면 보이는 위치 그대로 `bottom` 값으로 환산해 저장 (`.sb-resize-grip-top` 제거)
-- v2.5.2 (지금): 깃허브 자동 업데이트 연결 — 저장소 https://github.com/doguri25/smartboard-v2
+- v2.5.2: 깃허브 자동 업데이트 연결 — 저장소 https://github.com/doguri25/smartboard-v2
   - 앱의 업데이트 주소 기본값을 `https://github.com/doguri25/smartboard-v2/releases/latest/download/latest.json` 으로 내장 (`src/updater.ts` DEFAULT_UPDATE_URL).
     환경설정의 주소 칸은 비워 두면 기본값을 씀
   - `.github/workflows/build-windows.yml`: main 에 push 된 버전의 릴리스가 없으면 윈도우 러너에서 빌드 → 릴리스 생성 → setup.exe / .sig / latest.json 게시 (tauri-action).
     릴리스 본문은 `scripts/release-notes.mjs` 가 changelog 에서 만듦
+- v2.5.3 (지금): 판서·알림 사진 넣기 수정
+  - 윈도우 앱에서 사진을 끌어다 놓아도 반응이 없던 문제: Tauri 2 는 창 설정 `dragDropEnabled` 기본값이 true 라 파일 놓기를 Tauri 가 가로채고,
+    윈도우(WebView2)에서는 웹 화면에 HTML5 `drop` 이벤트가 오지 않음. 메인 창에 `"dragDropEnabled": false` (`src-tauri/tauri.conf.json`)
+  - 그 대신 편집 영역 밖에 파일을 놓으면 웹뷰가 그 파일을 열어 앱 화면이 사라지므로, 창 전체의 파일 dragover/drop 기본 동작을 막음.
+    편집 영역(`#notepad-editor`)은 글자 영역 바깥 여백에 놓아도 사진이 들어감 (`src/board-editor.ts` insertDroppedFiles)
+  - 열 수 없는 사진(아이폰 HEIC, 손상된 파일)은 `img.onload` 가 오지 않아 조용히 끝났음 → `onerror` 에서 이유를 안내.
+    윈도우에 HEIF 확장이 없으면 .heic 의 형식(type)이 비어 오므로 확장자로도 사진 여부를 판단
 
 ## 개발 PC 준비 (macOS, 한 번만)
 ```bash
