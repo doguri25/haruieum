@@ -30,14 +30,16 @@ export function fitToWidth(el: HTMLElement, opts: FitOptions = {}) {
     el.style.flex = "0 0 auto";
     const natural = el.scrollWidth;
     el.style.flex = "";
-    if (natural <= 0 || avail <= 0) { el.style.zoom = prev; return; }
-    const z = Math.min(max, Math.max(min, avail / natural));
-    el.style.zoom = z.toFixed(4);
+    el.style.zoom = natural <= 0 || avail <= 0 ? prev : Math.min(max, Math.max(min, avail / natural)).toFixed(4);
+    // 위에서 style 을 바꾼 것도 감시자(MutationObserver)에 잡혀 다시 계산 → 다시 style 변경 … 이 매 프레임 끝없이 반복됐음.
+    // 직접 바꾼 기록은 버림 (버튼 숨김/표시처럼 다른 곳에서 바꾼 것만 다시 계산)
+    mo.takeRecords();
   };
   const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
 
+  const mo = new MutationObserver(schedule);
   new ResizeObserver(schedule).observe(parent);
-  new MutationObserver(schedule).observe(el, { attributes: true, childList: true, subtree: true, attributeFilter: ["style", "class"] });
+  mo.observe(el, { attributes: true, childList: true, subtree: true, attributeFilter: ["style", "class"] });
   window.addEventListener("resize", schedule);
   document.fonts?.ready.then(schedule);
   window.addEventListener("load", schedule);

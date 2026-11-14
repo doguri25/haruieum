@@ -1,6 +1,6 @@
 [package]
 name = "smartboard-v2"
-version = "2.6.0"
+version = "2.7.0"
 description = "학교 전자칠판용 스마트 보드 (하루이음)"
 authors = ["도구리"]
 edition = "2021"
@@ -25,6 +25,8 @@ tauri-plugin-http = "=2.7.0"
 tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tauri-plugin-window-state = "2"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 # 2.5.0: 로그인 기억 — WebView2 설정(비밀번호 저장/자동 채우기)에 접근 (tauri 와 같은 버전)
 [target.'cfg(windows)'.dependencies]

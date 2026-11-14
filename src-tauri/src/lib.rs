@@ -6,6 +6,7 @@
 // 2.1.0: 자동 업데이트 (check_update / install_update)
 // 2.5.0: 로그인 기억 — WebView2(엣지 엔진)의 비밀번호 저장/자동 채우기 켜기
 // 2.6.0: 판서 사진을 data/images 파일로 (save_image·read_image·cleanup_images, sbimg 프로토콜)
+// 2.7.0: 창 위치·크기 기억 (tauri-plugin-window-state), 데이터 백업·복원 (export_backup / import_backup)
 //
 // 저장 위치: <앱 데이터 폴더>/data/
 //   settings.json, board.json, notice.json, saved-boards.json, popup-note.json
@@ -247,6 +248,153 @@ fn serve_image(app: &tauri::AppHandle, request: &tauri::http::Request<Vec<u8>>) 
         .unwrap_or_else(|_| tauri::http::Response::new(Vec::new()))
 }
 
+// ---------- 2.7.0: 데이터 백업·복원 ----------
+// 백업 파일(.zip) 안: <저장소>.json (settings·board·notice·saved-boards·popup-note), images/<사진>, alarm/<소리>,
+//                      haruieum-backup.json (만든 날짜·버전 표시용)
+// 창 위치(.window-state.json)와 사이트 로그인은 PC 마다 다르므로 넣지 않음.
+const STORE_NAMES: [&str; 5] = ["settings", "board", "notice", "saved-boards", "popup-note"];
+const BACKUP_MARK: &str = "haruieum-backup.json";
+
+/// 표시용 시각 문자열(JS 가 넘김)은 숫자·하이픈만
+fn check_stamp(stamp: &str) -> Result<(), String> {
+    if stamp.is_empty() || stamp.len() > 32 || !stamp.chars().all(|c| c.is_ascii_digit() || c == '-') {
+        return Err(format!("잘못된 시각: {stamp}"));
+    }
+    Ok(())
+}
+
+fn write_backup_zip(app: &tauri::AppHandle, dest: &std::path::Path, stamp: &str) -> Result<u32, String> {
+    use zip::write::SimpleFileOptions;
+    let dir = data_dir(app)?;
+    let tmp = dest.with_extension("zip.tmp");
+    let file = std::fs::File::create(&tmp).map_err(|e| format!("백업 파일을 만들 수 없습니다: {e}"))?;
+    let mut zip = zip::ZipWriter::new(file);
+    let deflated = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    let stored = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored); // 사진·소리는 이미 압축됨
+    let mut count = 0u32;
+    let mut add = |zip: &mut zip::ZipWriter<std::fs::File>, name: String, path: &std::path::Path, opts: SimpleFileOptions| -> Result<(), String> {
+        let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+        zip.start_file(name, opts).map_err(|e| e.to_string())?;
+        zip.write_all(&bytes).map_err(|e| e.to_string())?;
+        count += 1;
+        Ok(())
+    };
+    let result = (|| -> Result<(), String> {
+        for name in STORE_NAMES {
+            let p = dir.join(format!("{name}.json"));
+            if p.is_file() {
+                add(&mut zip, format!("{name}.json"), &p, deflated)?;
+            }
+        }
+        for sub in ["images", "alarm"] {
+            let Ok(rd) = std::fs::read_dir(dir.join(sub)) else { continue };
+            for entry in rd.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if entry.path().is_file() && !name.ends_with(".tmp") && check_file_name(&name).is_ok() {
+                    add(&mut zip, format!("{sub}/{name}"), &entry.path(), stored)?;
+                }
+            }
+        }
+        let info = serde_json::json!({ "app": "하루이음", "version": app.package_info().version.to_string(), "created": stamp });
+        zip.start_file(BACKUP_MARK, deflated).map_err(|e| e.to_string())?;
+        zip.write_all(info.to_string().as_bytes()).map_err(|e| e.to_string())?;
+        Ok(())
+    })();
+    let finished = result.and_then(|_| zip.finish().map(|_| ()).map_err(|e| e.to_string()));
+    if let Err(e) = finished {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(format!("백업 중 오류: {e}"));
+    }
+    std::fs::rename(&tmp, dest).map_err(|e| e.to_string())?;
+    Ok(count)
+}
+
+/// 지금 데이터를 dest(.zip) 로 백업. 담은 파일 수를 돌려줌 (JS 가 먼저 저장을 마친 뒤 호출)
+#[tauri::command]
+fn export_backup(app: tauri::AppHandle, dest: String, stamp: String) -> Result<u32, String> {
+    check_stamp(&stamp)?;
+    write_backup_zip(&app, std::path::Path::new(&dest), &stamp)
+}
+
+/// src(.zip) 로 복원. 먼저 지금 데이터를 <앱 데이터>/backups/before-restore-<시각>.zip 으로 남긴 뒤,
+/// 저장 파일(json)을 백업의 것으로 바꾸고 사진·소리를 추가함. 끝나면 JS 가 화면을 다시 읽음.
+/// 돌려주는 값: 자동으로 남긴 '복원 전' 백업 파일 경로
+#[tauri::command]
+fn import_backup(app: tauri::AppHandle, src: String, stamp: String) -> Result<String, String> {
+    check_stamp(&stamp)?;
+    let file = std::fs::File::open(&src).map_err(|e| format!("백업 파일을 열 수 없습니다: {e}"))?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|_| "하루이음 백업 파일(.zip)이 아닙니다.".to_string())?;
+    let names: Vec<String> = archive.file_names().map(String::from).collect();
+    if !names.iter().any(|n| n == BACKUP_MARK || n == "settings.json") {
+        return Err("하루이음 백업 파일이 아닙니다.".into());
+    }
+    // 저장 파일은 바꾸기 전에 전부 읽어서 JSON 인지 확인 (깨진 백업으로 지금 데이터를 지우지 않게)
+    let mut stores: Vec<(String, Vec<u8>)> = Vec::new();
+    for name in STORE_NAMES {
+        let entry_name = format!("{name}.json");
+        if let Ok(mut f) = archive.by_name(&entry_name) {
+            let mut buf = Vec::new();
+            std::io::Read::read_to_end(&mut f, &mut buf).map_err(|e| e.to_string())?;
+            serde_json::from_slice::<serde_json::Map<String, serde_json::Value>>(&buf)
+                .map_err(|_| format!("백업 안의 {entry_name} 가 손상되었습니다."))?;
+            stores.push((entry_name, buf));
+        }
+    }
+    if stores.is_empty() {
+        return Err("백업 파일에 저장된 내용이 없습니다.".into());
+    }
+
+    // 1) 지금 데이터 보관
+    let backups = app.path().app_data_dir().map_err(|e| e.to_string())?.join("backups");
+    std::fs::create_dir_all(&backups).map_err(|e| e.to_string())?;
+    let before = backups.join(format!("before-restore-{stamp}.zip"));
+    write_backup_zip(&app, &before, &stamp)?;
+
+    // 2) 사진·소리 (없는 것만 추가. 같은 이름의 사진은 내용도 같음)
+    let dir = data_dir(&app)?;
+    for i in 0..archive.len() {
+        let mut f = archive.by_index(i).map_err(|e| e.to_string())?;
+        let Some(path) = f.enclosed_name() else { continue };
+        let rel = path.to_string_lossy().replace('\\', "/");
+        let Some((sub, name)) = rel.split_once('/') else { continue };
+        let ok = match sub {
+            "images" => is_image_name(name),
+            "alarm" => check_file_name(name).is_ok(),
+            _ => false,
+        };
+        if !ok || name.contains('/') {
+            continue;
+        }
+        let target_dir = dir.join(sub);
+        std::fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
+        let target = target_dir.join(name);
+        if sub == "images" && target.exists() {
+            continue;
+        }
+        let tmp = target_dir.join(format!("{name}.tmp"));
+        let mut out = std::fs::File::create(&tmp).map_err(|e| e.to_string())?;
+        std::io::copy(&mut f, &mut out).map_err(|e| e.to_string())?;
+        out.sync_all().map_err(|e| e.to_string())?;
+        std::fs::rename(&tmp, &target).map_err(|e| e.to_string())?;
+    }
+
+    // 3) 저장 파일 교체: 백업에 없는 저장소는 비움(지난 데이터가 섞이지 않게), .bak 도 지움
+    for name in STORE_NAMES {
+        let _ = std::fs::remove_file(dir.join(format!("{name}.json.bak")));
+        let _ = std::fs::remove_file(dir.join(format!("{name}.json")));
+    }
+    for (entry_name, bytes) in stores {
+        let tmp = dir.join(format!("{entry_name}.tmp"));
+        {
+            let mut f = std::fs::File::create(&tmp).map_err(|e| e.to_string())?;
+            f.write_all(&bytes).map_err(|e| e.to_string())?;
+            f.sync_all().map_err(|e| e.to_string())?;
+        }
+        std::fs::rename(&tmp, dir.join(&entry_name)).map_err(|e| e.to_string())?;
+    }
+    Ok(before.to_string_lossy().to_string())
+}
+
 /// v1(일렉트론) 앱이 남긴 저장 파일 내용. 없으면 빈 문자열.
 /// Windows: %APPDATA%\SmartBoardApp\SmartBoard_SaveData.json
 /// macOS:   ~/Library/Application Support/SmartBoardApp/SmartBoard_SaveData.json
@@ -390,6 +538,20 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(login_memory_plugin())
+        // 2.7.0: 메인 창의 위치·크기·최대화를 기억 (듀얼 모니터에서 닫은 화면에 다시 뜸).
+        // 저장된 위치가 지금 연결된 어느 모니터에도 걸치지 않으면(모니터를 뺀 경우) 위치는 되살리지 않고 OS 에 맡김.
+        // 창은 숨긴 채 만들어지고(tauri.conf.json visible:false) 위치를 되살린 뒤 이 플러그인이 보여 줌
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::POSITION
+                        | tauri_plugin_window_state::StateFlags::SIZE
+                        | tauri_plugin_window_state::StateFlags::MAXIMIZED
+                        | tauri_plugin_window_state::StateFlags::VISIBLE,
+                )
+                .with_filter(|label| label == "main")
+                .build(),
+        )
         // 2.6.0: 판서 사진 파일 (data/images) 을 웹뷰에 보여 주는 주소
         .register_uri_scheme_protocol("sbimg", |ctx, request| serve_image(ctx.app_handle(), &request))
         .invoke_handler(tauri::generate_handler![
@@ -400,6 +562,8 @@ pub fn run() {
             read_image,
             cleanup_images,
             snapshot_store_once,
+            export_backup,
+            import_backup,
             import_alarm_mp3,
             read_alarm_mp3,
             load_v1_data,

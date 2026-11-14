@@ -23,6 +23,8 @@ import { cleanupUnusedImages, migrateStoredImages } from "./board-images"; // �
 import "./weather";      // window.weather (기상청·에어코리아)
 import "./youtube";      // window.youtubeUI (유튜브 검색·재생)
 import "./lunch";        // window.lunch (급식·알레르기)
+import "./school-calendar"; // window.schoolCalendar (학사일정·휴일 자동 무음, 2.7.0)
+import "./backup";       // window.dataBackup (데이터 백업·복원, 2.7.0)
 // 글꼴: 구글 폰트 CDN 대신 앱에 포함 (오프라인에서도 같은 모양)
 import "@fontsource/jua";
 import "@fontsource/nanum-gothic";
@@ -108,8 +110,29 @@ async function installCloseFlush() {
   document.addEventListener("visibilitychange", () => { if (document.hidden) void storage.flushAll(); });
 }
 
+// --- 창 위치·크기 기억 (2.7.0) --------------------------------------------
+// 되살리기와 종료 때 저장은 Rust 의 window-state 플러그인이 함. 여기서는
+//  1) 창이 숨겨진 채 남아 있으면 보이게 함 (창은 위치를 되살린 뒤 보이도록 숨긴 채 만들어짐 — 만일을 위한 안전장치)
+//  2) 옮기거나 크기를 바꾸면 1.5초 뒤 저장 → 앱을 닫지 않고 PC 를 꺼도 마지막 위치가 남음
+async function ensureWindowVisible() {
+  if (!isTauri()) return;
+  const win = getCurrentWindow();
+  try { if (!(await win.isVisible())) { await win.show(); await win.setFocus(); } } catch (e) { console.warn("창 표시 확인 실패:", e); }
+}
+async function installWindowStateSaver() {
+  if (!isTauri()) return;
+  const win = getCurrentWindow();
+  const { saveWindowState, StateFlags } = await import("@tauri-apps/plugin-window-state");
+  const flags = StateFlags.POSITION | StateFlags.SIZE | StateFlags.MAXIMIZED | StateFlags.VISIBLE;
+  let t = 0;
+  const later = () => { window.clearTimeout(t); t = window.setTimeout(() => { saveWindowState(flags).catch((e) => console.warn("창 위치 저장 실패:", e)); }, 1500); };
+  await win.onMoved(later);
+  await win.onResized(later);
+}
+
 // --- 시작 ------------------------------------------------------------------
 async function boot() {
+  void ensureWindowVisible(); // 다른 무엇보다 먼저 (시작 중 오류가 나도 창은 보이게)
   storage.onError = showToast;
   await storage.init();
   // 예전 base64 사진을 파일로 옮김 (편집기가 내용을 읽기 전에). 실패해도 사진은 그대로 남으므로 앱은 계속 띄움
@@ -125,6 +148,7 @@ async function boot() {
   initUpdater();        // 자동 업데이트 확인
   void preloadAlarm(storage.getItem("smartBoardCustomMp3") || "");
   void installCloseFlush();
+  void installWindowStateSaver();
   // 쓰지 않는 사진 파일 정리는 시작이 끝나고 조금 뒤에
   window.setTimeout(() => { cleanupUnusedImages().catch((e) => console.warn("사진 정리 실패:", e)); }, 30_000);
   console.log("smartboard v2 loaded", isTauri() ? "(tauri)" : "(browser)");

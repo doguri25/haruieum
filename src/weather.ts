@@ -189,12 +189,28 @@ function describe(sky: number, pty: number, isDay: boolean) {
   if (sky === 3) return { desc: "구름많음", icon: isDay ? "cloud-sun" : "cloud-moon", color: "text-blue-400" };
   return { desc: "흐림", icon: "cloud", color: "text-slate-400" };
 }
-function dustGrade(v: number | null) {
-  if (v === null) return { text: "정보없음", color: "text-slate-400", bg: "bg-slate-50", border: "border-slate-100" };
-  if (v <= 30) return { text: "좋음", color: "text-blue-500", bg: "bg-blue-50", border: "border-blue-100" };
-  if (v <= 80) return { text: "보통", color: "text-emerald-500", bg: "bg-emerald-50", border: "border-emerald-100" };
-  if (v <= 150) return { text: "나쁨", color: "text-orange-500", bg: "bg-orange-50", border: "border-orange-100" };
-  return { text: "매우나쁨", color: "text-red-500", bg: "bg-red-50", border: "border-red-100" };
+// 환경부 기준 (㎍/㎥): PM10 좋음 0~30 · 보통 ~80 · 나쁨 ~150 · 매우나쁨 151~
+//                    PM2.5 좋음 0~15 · 보통 ~35 · 나쁨 ~75 · 매우나쁨 76~
+// 2.7.0: 예전엔 PM2.5 를 2배 해서 PM10 기준에 맞췄는데, 그러면 36~40 이 '나쁨'이 아니라 '보통'으로 나왔고,
+//        머리글은 PM10 만 봐서 초미세먼지가 나쁜 날에도 '보통'으로 보였음
+const DUST_GRADES = [
+  { text: "좋음", color: "text-blue-500", bg: "bg-blue-50", border: "border-blue-100" },
+  { text: "보통", color: "text-emerald-500", bg: "bg-emerald-50", border: "border-emerald-100" },
+  { text: "나쁨", color: "text-orange-500", bg: "bg-orange-50", border: "border-orange-100" },
+  { text: "매우나쁨", color: "text-red-500", bg: "bg-red-50", border: "border-red-100" },
+];
+const NO_DUST = { text: "정보없음", color: "text-slate-400", bg: "bg-slate-50", border: "border-slate-100", rank: -1 };
+const DUST_LIMITS = { pm10: [30, 80, 150], pm25: [15, 35, 75] };
+export function dustGrade(v: number | null | undefined, kind: "pm10" | "pm25" = "pm10") {
+  if (v === null || v === undefined || Number.isNaN(v)) return NO_DUST;
+  const lim = DUST_LIMITS[kind];
+  const rank = v <= lim[0] ? 0 : v <= lim[1] ? 1 : v <= lim[2] ? 2 : 3;
+  return { ...DUST_GRADES[rank], rank };
+}
+/** 머리글용: PM10 과 PM2.5 중 더 나쁜 등급 */
+export function worstDustGrade(pm10: number | null | undefined, pm25: number | null | undefined) {
+  const a = dustGrade(pm10, "pm10"), b = dustGrade(pm25, "pm25");
+  return b.rank > a.rank ? b : a;
 }
 const el = (id: string) => document.getElementById(id);
 const icons = () => window.lucide?.createIcons();
@@ -230,7 +246,7 @@ export async function refreshWeather() {
   } else {
     setHeader('<i data-lucide="alert-circle" class="mr-2 text-red-500 w-6 h-6"></i>', "날씨 정보 오류");
   }
-  const dg = dustGrade(lastDust?.pm10 ?? null);
+  const dg = worstDustGrade(lastDust?.pm10, lastDust?.pm25);
   const dc = el("header-dust-container"), dt = el("header-dust-text");
   if (dc) dc.className = `flex items-center text-lg font-bold ${dg.color}`;
   if (dt) dt.innerText = lastDust ? `미세먼지: ${dg.text}` : "미세먼지: 정보없음";
@@ -250,7 +266,7 @@ function renderModal(r: Region) {
   }
   const w = lastWeather, c = w.current;
   const info = describe(c.sky, c.pty, isDaytime(new Date().getHours()));
-  const dg = dustGrade(lastDust?.pm10 ?? null), dg25 = dustGrade(lastDust?.pm25 === null || lastDust?.pm25 === undefined ? null : lastDust.pm25 * 2);
+  const dg = dustGrade(lastDust?.pm10, "pm10"), dg25 = dustGrade(lastDust?.pm25, "pm25");
   const hourly = w.hourly.map((h, i) => {
     const hi = describe(h.sky, h.pty, isDaytime(h.hour));
     return `<div class="flex flex-col items-center min-w-[4.5rem] shrink-0"><span class="text-base ${i === 0 ? "text-blue-600 font-bold" : "text-slate-500"} mb-2">${h.label}</span><i data-lucide="${hi.icon}" class="${hi.color} w-8 h-8 mb-2"></i><span class="text-xl font-bold">${h.temp ?? "-"}°C</span></div>`;
@@ -278,7 +294,7 @@ function renderModal(r: Region) {
     </div>
     <div class="grid grid-cols-2 gap-4 mb-6 shrink-0">
       <div class="${dg.bg} p-4 rounded-xl border ${dg.border} flex flex-col items-center shadow-sm"><i data-lucide="wind" class="${dg.color} w-8 h-8 mb-2"></i><span class="text-base font-bold">미세먼지 (PM10)</span><span class="text-2xl font-bold ${dg.color}">${dg.text}</span><span class="text-xs text-slate-400">${lastDust?.pm10 ?? "-"}㎍/㎥ · ${lastDust?.station ?? ""}</span></div>
-      <div class="${dg25.bg} p-4 rounded-xl border ${dg25.border} flex flex-col items-center shadow-sm"><i data-lucide="haze" class="${dg25.color} w-8 h-8 mb-2"></i><span class="text-base font-bold">초미세먼지 (PM2.5)</span><span class="text-2xl font-bold ${dg25.color}">${lastDust?.pm25 === null || lastDust?.pm25 === undefined ? "정보없음" : dustGrade(lastDust.pm25 * 2).text}</span><span class="text-xs text-slate-400">${lastDust?.pm25 ?? "-"}㎍/㎥</span></div>
+      <div class="${dg25.bg} p-4 rounded-xl border ${dg25.border} flex flex-col items-center shadow-sm"><i data-lucide="haze" class="${dg25.color} w-8 h-8 mb-2"></i><span class="text-base font-bold">초미세먼지 (PM2.5)</span><span class="text-2xl font-bold ${dg25.color}">${dg25.text}</span><span class="text-xs text-slate-400">${lastDust?.pm25 ?? "-"}㎍/㎥</span></div>
     </div>
     <div class="mb-2 font-bold text-slate-600">시간별 예보</div>
     <div class="flex overflow-x-auto gap-2 pb-3 hide-scrollbar shrink-0">${hourly || '<span class="text-slate-400">예보 없음</span>'}</div>

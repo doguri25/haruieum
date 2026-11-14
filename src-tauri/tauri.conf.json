@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "SmartBoard",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "identifier": "com.doguri.smartboard",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -19,6 +19,7 @@
         "minWidth": 1024,
         "minHeight": 640,
         "center": true,
+        "visible": false,
         "useHttpsScheme": true,
         "dragDropEnabled": false
       }

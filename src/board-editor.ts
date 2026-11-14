@@ -13,7 +13,7 @@ import { TextAlign } from "@tiptap/extension-text-align";
 import { TableKit } from "@tiptap/extension-table";
 import Image from "@tiptap/extension-image";
 import { Placeholder } from "@tiptap/extensions";
-import { NodeSelection, TextSelection } from "@tiptap/pm/state";
+import { EditorState, NodeSelection, TextSelection } from "@tiptap/pm/state";
 import { loadImageBlob, resolveImageSrc, storeImage } from "./board-images";
 import { openImageViewer } from "./image-viewer";
 
@@ -238,7 +238,13 @@ class BoardEditor {
 
   // ---------- 내용 ----------
   getHTML() { return this.editor.isEmpty ? "" : this.editor.getHTML(); }
-  setHTML(html: string) { this.editor.commands.setContent(html || "", { emitUpdate: false }); }
+  /** 내용을 통째로 바꿈 (시작·판서↔알림 전환·기록 불러오기). 되돌리기 기록도 비움:
+   *  남겨 두면 알림으로 바꾼 뒤 Ctrl+Z 한 번에 판서 내용이 돌아와 알림장으로 저장돼 버렸음 */
+  setHTML(html: string) {
+    this.editor.commands.setContent(html || "", { emitUpdate: false });
+    const { state, view } = this.editor;
+    view.updateState(EditorState.create({ doc: state.doc, plugins: state.plugins, selection: state.selection }));
+  }
   clear() { this.editor.commands.clearContent(false); }
   isEmpty() { return this.editor.isEmpty; }
   onUpdate(cb: UpdateListener) { this.listeners.push(cb); }

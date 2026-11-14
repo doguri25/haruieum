@@ -78,6 +78,7 @@ export function startLegacyApp() {
         
         let lastCheckedMinuteStr = null; 
         let lastTickTime = null;   // 마지막으로 시계를 돌린 시각 (놓친 분 확인용)
+        let lastClockDay = null;   // 날짜가 바뀌었는지 확인용 (켜 둔 채 밤을 넘기는 경우)
         let timerEndAt = 0;        // 타이머 종료 시각(ms). 남은 시간은 매 tick 마다 여기서 계산
         let lastAlarmKey = null;
         let audioUnlocked = false;
@@ -89,7 +90,8 @@ export function startLegacyApp() {
         let popupNoteIsBold = storage.getItem('smartBoardPopupNoteIsBold') === 'true';
         let popupNoteColor = storage.getItem('smartBoardPopupNoteColor') || '#1e293b';
         
-        let boardBgColor = storage.getItem('smartBoardNotepadBg') || 'inherit';
+        // 판서 배경색은 모드별 키(_board/_notice)에 저장됨. 예전엔 시작할 때 옛 키만 읽어서 다시 켜면 배경이 돌아오지 않았음
+        let boardBgColor = storage.getItem('smartBoardNotepadBg_board') || storage.getItem('smartBoardNotepadBg') || 'inherit';
         
         // 소음 측정기 변수
         let noiseStream = null;
@@ -132,6 +134,9 @@ export function startLegacyApp() {
                     if (fontSizeInput) fontSizeInput.value = currentBoardFontSize;
                     // 내용이 바뀔 때마다 현재 모드(판서/알림)의 키에 저장
                     boardEditor.onUpdate(() => { storage.setItem(currentEditorKey(), boardEditor.getHTML()); });
+                    // 어제 켜 두었던 알림장을 기록 목록에 (날짜가 바뀐 경우만).
+                    // 이 시점엔 아래쪽의 currentBoardMode 가 아직 선언 전이라, 시작이 끝난 뒤에 실행
+                    setTimeout(() => { try { autoArchiveNotice(); } catch (e) { console.error('알림장 자동 보관 실패:', e); } }, 0);
                 }
                 const ta = document.getElementById('popup-note-textarea');
                 if(ta) {
@@ -160,6 +165,8 @@ export function startLegacyApp() {
             } catch(e) {}
 
             try { refreshIcons(); applyLunchPosition(); initClock(); renderTimetable(); setupControls(); applyToolVisibility(); renderBoardColors(); } catch(e) {}
+            // 학사일정(휴업일)을 받아 오면 시간표를 다시 그림 (휴업일이면 '쉬는 날' 표시)
+            if (window.schoolCalendar) window.schoolCalendar.refreshToday().then(() => { try { renderTimetable(); } catch(e) {} });
             try { fetchWeatherData(); setInterval(fetchWeatherData, 1800000); } catch(e) {}
             
             applyTimetablePos();
@@ -562,6 +569,8 @@ export function startLegacyApp() {
                 storage.removeItem('smartBoardCurrentNotepad'); 
                 storage.removeItem('smartBoardSavedData'); 
                 storage.removeItem('smartBoardNotepadBg');
+                storage.removeItem('smartBoardNotepadBg_board');
+                storage.removeItem('smartBoardNotepadBg_notice');
                 boardEditor.clear(); 
                 changeBoardBg('inherit');
                 const sel = document.getElementById('board-bg-select');
@@ -634,9 +643,20 @@ export function startLegacyApp() {
             if (lastTickTime && now - lastTickTime > 90000 && now - lastTickTime < 10 * 60000) {
                 for (let t = new Date(lastTickTime.getTime() + 60000); t < now; t = new Date(t.getTime() + 60000)) checkAlarms(t);
             }
+            // 날짜가 바뀌면(켜 둔 채 자정을 넘기거나 절전에서 깨어남) 오늘 시간표로 다시 그림.
+            // 예전엔 시작할 때만 그려서 화요일 아침에도 월요일 과목이 보였음
+            const dayKey = now.toDateString();
+            if (lastClockDay !== null && lastClockDay !== dayKey) onDayChanged(now);
+            lastClockDay = dayKey;
             checkAlarms(now); 
             lastTickTime = now;
             tickTimer();
+        }
+
+        function onDayChanged(now) {
+            try { renderTimetable(); } catch(e) { console.error('시간표 갱신 실패:', e); }
+            try { autoArchiveNotice(now); } catch(e) { console.error('알림장 자동 보관 실패:', e); }
+            if (window.schoolCalendar) window.schoolCalendar.refreshToday().then(() => { try { renderTimetable(); } catch(e) {} });
         }
 
         function setupControls() { const vs = document.getElementById('volume-slider'); const vv = document.getElementById('volume-val'); if(vs && vv) { vs.value = globalVolume; vv.innerText = Math.round(globalVolume * 100) + '%'; vs.addEventListener('input', (e) => { globalVolume = parseFloat(e.target.value); vv.innerText = Math.round(globalVolume * 100) + '%'; storage.setItem('smartBoardVolume', globalVolume); }); } }
@@ -644,9 +664,9 @@ export function startLegacyApp() {
             document.getElementById('modal-lunch').classList.add('active');
             document.getElementById('allergy-panel')?.classList.add('hidden');
             if (window.lunch.hasSchool()) { document.getElementById('school-selector-panel').classList.add('hidden'); fetchLunchData(); }
-            else { document.getElementById('school-selector-panel').classList.remove('hidden'); }
+            else { document.getElementById('school-selector-panel').classList.remove('hidden'); window.lunch.fillNeisKey(); }
         }
-        function toggleSchoolSelector() { const p = document.getElementById('school-selector-panel'); p.classList.toggle('hidden'); if (!p.classList.contains('hidden')) { document.getElementById('allergy-panel')?.classList.add('hidden'); document.getElementById('school-search-input').focus(); } }
+        function toggleSchoolSelector() { const p = document.getElementById('school-selector-panel'); p.classList.toggle('hidden'); if (!p.classList.contains('hidden')) { document.getElementById('allergy-panel')?.classList.add('hidden'); window.lunch.fillNeisKey(); document.getElementById('school-search-input').focus(); } }
         
         async function searchSchool() { return window.lunch.search(); }
 
@@ -734,9 +754,56 @@ export function startLegacyApp() {
             openSavedBoards();
         }
 
-        function openSavedBoards() { renderSavedBoards(); document.getElementById('modal-saved-list').classList.add('active'); }
-        function renderSavedBoards() { const c = document.getElementById('saved-boards-container'); c.innerHTML = ''; if(savedBoards.length === 0) { c.innerHTML = '<div class="text-center text-slate-500 py-10 font-bold bg-white rounded-xl">저장된 기록이 없습니다.</div>'; return; } savedBoards.forEach(b => { const el = document.createElement('div'); el.className = 'flex items-center justify-between p-5 bg-white border border-slate-200 rounded-2xl hover:border-indigo-300 hover:shadow-md transition cursor-pointer group'; el.innerHTML = `<div class="flex-1 overflow-hidden" onclick="viewSavedBoard(${b.id})"><h4 class="font-bold text-slate-800 text-xl flex items-center mb-1 truncate"><i data-lucide="file-text" class="w-6 h-6 mr-2 text-indigo-500 shrink-0"></i>${b.title}</h4><span class="text-base text-slate-500 font-bold ml-8">${b.date}</span></div><button onclick="deleteSavedBoard(${b.id}, event)" class="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition opacity-0 group-hover:opacity-100" title="삭제"><i data-lucide="trash-2" class="w-6 h-6"></i></button>`; c.appendChild(el); }); refreshIcons(); }
-        function viewSavedBoard(id) { const b = savedBoards.find(x => x.id === id); if(!b) return; document.getElementById('viewer-date').innerText = b.date; const vc = document.getElementById('viewer-content'); vc.innerHTML = b.content; if (window.boardImages) window.boardImages.resolveImagesIn(vc); document.getElementById('modal-board-viewer').classList.add('active'); }
+        function openSavedBoards() { renderSavedBoards(); const t = document.getElementById('toggle-notice-autoarchive'); if (t) t.checked = isNoticeAutoArchiveOn(); document.getElementById('modal-saved-list').classList.add('active'); }
+        function renderSavedBoards() { const c = document.getElementById('saved-boards-container'); c.innerHTML = ''; if(savedBoards.length === 0) { c.innerHTML = '<div class="text-center text-slate-500 py-10 font-bold bg-white rounded-xl">저장된 기록이 없습니다.</div>'; return; } savedBoards.forEach(b => { const el = document.createElement('div'); el.className = 'flex items-center justify-between p-5 bg-white border border-slate-200 rounded-2xl hover:border-indigo-300 hover:shadow-md transition cursor-pointer group'; el.innerHTML = `<div class="flex-1 overflow-hidden" onclick="viewSavedBoard(${b.id})"><h4 class="font-bold text-slate-800 text-xl flex items-center mb-1 truncate"><i data-lucide="file-text" class="w-6 h-6 mr-2 text-indigo-500 shrink-0"></i>${b.title}</h4><span class="text-base text-slate-500 font-bold ml-8">${b.date}</span></div><button onclick="deleteSavedBoard(${b.id}, event)" class="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition" title="삭제"><i data-lucide="trash-2" class="w-6 h-6"></i></button>`; c.appendChild(el); }); refreshIcons(); }
+        function viewSavedBoard(id) { const b = savedBoards.find(x => x.id === id); if(!b) return; viewingBoardId = id; document.getElementById('viewer-date').innerText = b.date; const vc = document.getElementById('viewer-content'); vc.innerHTML = b.content; if (window.boardImages) window.boardImages.resolveImagesIn(vc); document.getElementById('modal-board-viewer').classList.add('active'); }
+        // ---------- 2.7.0: 보관한 기록 다시 불러와 고치기 ----------
+        // [판서] 기록은 판서로, [알림] 기록은 알림으로, 그 밖(팝업노트 등)은 지금 화면으로 불러옴.
+        // 지금 내용이 있으면 확인을 받고, 덮어쓰기 전에 지금 내용을 목록에 자동 보관함 (잃어버리지 않게)
+        let viewingBoardId = null;
+        function loadViewedBoard() {
+            const b = savedBoards.find(x => x.id === viewingBoardId); if (!b) return;
+            const target = b.title.startsWith('[알림]') ? 'notice' : (b.title.startsWith('[판서]') ? 'board' : currentBoardMode);
+            const key = target === 'board' ? 'smartBoardCurrentNotepad' : 'smartBoardCurrentNotice';
+            const label = target === 'board' ? '판서' : '알림';
+            const cur = target === currentBoardMode ? boardEditor.getHTML() : (storage.getItem(key) || '');
+            if (hasContent(cur) && cur !== b.content) {
+                if (!confirm(`지금 ${label} 내용을 이 기록으로 바꿀까요?\n지금 내용은 기록 목록에 자동으로 보관됩니다.`)) return;
+                savedBoards.unshift({ id: Date.now(), title: `[${label}] ${nowStamp()} (불러오기 전 자동 보관)`, date: nowStamp(), content: cur });
+                storage.setItem('smartBoardSavedData', JSON.stringify(savedBoards));
+            }
+            storage.setItem(key, b.content);
+            closeModal('modal-board-viewer'); closeModal('modal-saved-list');
+            if (target === currentBoardMode) { boardEditor.setHTML(b.content); boardEditor.focusNoScroll(); }
+            else toggleBoardMode(); // 전환하면서 방금 넣은 내용을 읽어 옴
+        }
+
+        // ---------- 2.7.0: 알림장 날짜별 자동 보관 ----------
+        // 날짜가 바뀌면(앱을 켤 때, 또는 켜 둔 채 자정을 넘길 때) 전날 알림장을 기록 목록에 넣음.
+        // 알림장 내용은 그대로 두어 이어서 고쳐 쓸 수 있고, 바뀌지 않은 내용은 다시 보관하지 않음.
+        // 끄기: 기록 목록 창의 '알림장 날짜별 자동 보관' (키 smartBoardNoticeAutoArchive)
+        function ymdKey(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+        function nowStamp(d = new Date()) { return `${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+        function hasContent(html) { return !!html && (html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() !== '' || /<(img|table)\b/i.test(html)); }
+        function textHash(str) { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(16) + ':' + str.length; }
+        function isNoticeAutoArchiveOn() { return storage.getItem('smartBoardNoticeAutoArchive') !== 'false'; }
+        function setNoticeAutoArchive(on) { storage.setItem('smartBoardNoticeAutoArchive', on ? 'true' : 'false'); }
+        function autoArchiveNotice(now = new Date()) {
+            const today = ymdKey(now);
+            const lastDay = storage.getItem('smartBoardNoticeDay');
+            if (lastDay === today) return;
+            storage.setItem('smartBoardNoticeDay', today);
+            if (!lastDay || !isNoticeAutoArchiveOn()) return;
+            const html = currentBoardMode === 'notice' ? boardEditor.getHTML() : (storage.getItem('smartBoardCurrentNotice') || '');
+            if (!hasContent(html)) return;
+            const h = textHash(html);
+            if (h === storage.getItem('smartBoardNoticeArchivedHash')) return;
+            const [y, m, d] = lastDay.split('-').map(Number);
+            savedBoards.unshift({ id: Date.now(), title: `[알림] ${y}.${m}.${d} (자동 보관)`, date: nowStamp(now), content: html });
+            storage.setItem('smartBoardSavedData', JSON.stringify(savedBoards));
+            storage.setItem('smartBoardNoticeArchivedHash', h);
+        }
+
         function deleteSavedBoard(id, ev) { ev.stopPropagation(); if(confirm('이 기록을 정말 삭제하시겠습니까?')) { savedBoards = savedBoards.filter(b => b.id !== id); storage.setItem('smartBoardSavedData', JSON.stringify(savedBoards)); renderSavedBoards(); } }
         function applyToolVisibility() { const t = ['picker', 'timer', 'noise', 'attention', 'lunch', 'youtube', 'tinkerbell', 'iscream', 'popupnote', 'activity']; t.forEach(id => { const el = document.getElementById(`btn-tool-${id}`); if(el) el.style.display = (toolVisibility[id] === false) ? 'none' : 'flex'; }); }
         
@@ -750,7 +817,14 @@ export function startLegacyApp() {
             el.className = `text-2xl font-bold px-2 py-1.5 rounded-xl border-2 shrink-0 w-32 text-center shadow-sm outline-none ${getSubjectColorClasses(el.value)} ml-1 slot-subject`; 
         }
 
-        function toggleMutePeriod(i) { mutedPeriods[i] = !mutedPeriods[i]; storage.setItem('smartBoardMutedPeriods', JSON.stringify(mutedPeriods)); renderTimetable(); }
+        // 교시 이름·시간을 누르면 그 교시 종을 끄고 켬. 터치 칠판에서 스치기만 해도 매일 종이 꺼지던 문제 → 한 번 확인
+        function ringBellsToday() { if (window.schoolCalendar) window.schoolCalendar.ringToday(); renderTimetable(); }
+        function toggleMutePeriod(i) {
+            const name = (timeSlots[i] && timeSlots[i].name) || `${i + 1}번째 시간`;
+            const q = mutedPeriods[i] ? `${name} 종을 다시 켤까요?` : `${name} 종을 끌까요?\n끄면 매일 이 시간에 종이 울리지 않습니다. (다시 누르면 켤 수 있어요)`;
+            if (!confirm(q)) return;
+            mutedPeriods[i] = !mutedPeriods[i]; storage.setItem('smartBoardMutedPeriods', JSON.stringify(mutedPeriods)); renderTimetable();
+        }
         function getSubjectColorClasses(s) { 
             if(!s) return 'bg-white text-slate-700 border-slate-200'; 
             if(s.includes('국어')) return 'bg-red-100 text-red-800 border-red-300'; 
@@ -788,6 +862,14 @@ export function startLegacyApp() {
             for (let idx in dailyOverride.overrides) { s[idx] = dailyOverride.overrides[idx]; }
 
             if(d === 0 || d === 6) { c.innerHTML = '<div class="flex h-full items-center justify-center text-slate-400 font-bold text-2xl">주말입니다!</div>'; return; } 
+            // 2.7.0: 학사일정상 휴업일·공휴일이면 종이 울리지 않는다고 알림 (그날만 다시 켤 수 있음)
+            const holidayName = window.schoolCalendar ? window.schoolCalendar.holidayOn(now) : null;
+            if (holidayName) {
+                const safe = holidayName.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+                c.innerHTML = `<div class="flex flex-col h-full items-center justify-center text-center gap-2 px-4"><i data-lucide="bell-off" class="w-10 h-10 text-rose-300"></i><span class="text-slate-500 font-bold text-2xl">오늘은 쉬는 날</span><span class="text-rose-500 font-bold text-xl">${safe}</span><span class="text-slate-400 font-bold text-sm">학사일정에 따라 종이 울리지 않습니다</span><button onclick="ringBellsToday()" class="mt-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm transition">오늘은 종 울리기</button></div>`;
+                refreshIcons();
+                return;
+            }
             
             timeSlots.forEach((sl, i) => { 
                 const m = mutedPeriods[i]; 
@@ -810,7 +892,8 @@ export function startLegacyApp() {
         /* parseDust: src/weather.ts 로 이동 */
         /* updateWeatherUI: src/weather.ts 로 이동 */
         function openCalendar() { currentCalendarDate = new Date(); renderCalendar(); document.getElementById('modal-calendar').classList.add('active'); }
-        function renderCalendar() { const y = currentCalendarDate.getFullYear(); const m = currentCalendarDate.getMonth(); document.getElementById('calendar-month-year').innerText = `${y}년 ${m + 1}월`; const fd = new Date(y, m, 1).getDay(); const dim = new Date(y, m + 1, 0).getDate(); const g = document.getElementById('calendar-grid'); g.innerHTML = ''; const days = ['일', '월', '화', '수', '목', '금', '토']; days.forEach((d, i) => { g.innerHTML += `<div class="text-center font-bold ${i===0?'text-red-500':(i===6?'text-blue-500':'text-slate-500')} text-base py-2">${d}</div>`; }); for (let i = 0; i < fd; i++) g.innerHTML += `<div></div>`; const td = new Date(); for (let i = 1; i <= dim; i++) { let isT = (td.getDate() === i && td.getMonth() === m && td.getFullYear() === y); g.innerHTML += `<div class="flex items-center justify-center h-12 w-12 mx-auto rounded-full font-bold text-lg ${isT?'bg-brand-500 text-white shadow-md':'text-slate-700'}">${i}</div>`; } }
+        // 2.7.0: 학사일정(휴업일·행사)을 함께 보여 주는 달력 (src/school-calendar.ts)
+        function renderCalendar() { window.schoolCalendar.renderMonth(currentCalendarDate); }
         function changeCalendarMonth(o) { currentCalendarDate.setMonth(currentCalendarDate.getMonth() + o); renderCalendar(); }
         function resetCalendarToToday() { currentCalendarDate = new Date(); renderCalendar(); }
 
@@ -866,12 +949,8 @@ export function startLegacyApp() {
             stopAudio(); initAudio(); isAudioPlaying = true; 
 
             if (type === 4) {
-                if (!customMp3FileName) {
-                    alert("환경설정 창에서 'MP3 찾기'로 소리 파일을 선택해 주세요.");
-                    isAudioPlaying = false;
-                    return 5;
-                }
-                currentMp3Audio = new Audio(window.smartboardHost ? window.smartboardHost.getAlarmUrl(customMp3FileName) : customMp3FileName);
+                // 고른 파일이 없으면 기본음(public/alarm.mp3). 예전엔 경고창만 뜨고 아무 소리도 안 났음
+                currentMp3Audio = new Audio(window.smartboardHost ? window.smartboardHost.getAlarmUrl(customMp3FileName) : (customMp3FileName || 'alarm.mp3'));
                 currentMp3Audio.volume = globalVolume;
                 currentMp3Audio.play().catch(e => {
                     console.error("MP3 재생 오류:", e);
@@ -1276,7 +1355,12 @@ function checkAlarms(now) {
     const dateKey = now.getDate();
     const currentKey = `${dateKey}-${timeStr}`;
     
-    if (isLeaveWorkEnabled && timeStr === leaveWorkTime && lastAlarmKey !== `leave-${currentKey}`) {
+    // 2.7.0: 주말과 학사일정상 휴업일·공휴일(src/school-calendar.ts)에는 수업 종과 퇴근 알람을 울리지 않음
+    const dowNow = now.getDay();
+    const holidayNow = window.schoolCalendar ? window.schoolCalendar.holidayOn(now) : null;
+    const schoolOff = dowNow === 0 || dowNow === 6 || !!holidayNow;
+
+    if (!schoolOff && isLeaveWorkEnabled && timeStr === leaveWorkTime && lastAlarmKey !== `leave-${currentKey}`) {
         if (leaveWorkPopupEnabled) { showAlarm("퇴근 시간 안내", "선생님, 오늘 하루도 수고 많으셨습니다!", true, "선생님, 퇴근 시간입니다. 수고하셨습니다.", true); } 
         else { playTTS("선생님, 퇴근 시간입니다. 수고하셨습니다."); }
         lastAlarmKey = `leave-${currentKey}`; alarmTriggered = true;
@@ -1297,8 +1381,11 @@ function checkAlarms(now) {
         let lp = -1; for(let i = sch.length - 1; i >= 0; i--) { if(sch[i] && sch[i].trim() !== '') { lp = i; break; } }
         if (lp === -1) lp = timeSlots.length - 1; 
         let pendingAlarm = null;
+        // 수업이 하나도 없는 날(주말 등)에는 점심 칸만으로 종이 울리지 않게 (예전엔 빈 점심 칸을 '점심'으로 채워 토요일에도 울렸음)
+        const hasClass = sch.some((v, i) => v && v.trim() !== '' && v.trim() !== '점심' && timeSlots[i] && timeSlots[i].name !== '점심');
 
         for(let i = 0; i < timeSlots.length; i++) {
+            if (schoolOff || !hasClass) break;
             const slot = timeSlots[i]; if (mutedPeriods[i]) continue; 
             let sub = sch[i] ? sch[i].trim() : ''; const isLunch = slot.name === '점심';
             if (isLunch && sub === '') sub = '점심'; if (sub === '') continue; 
@@ -1310,10 +1397,18 @@ function checkAlarms(now) {
             const sK = `start-${i}-${currentKey}`; const eK = `end-${i}-${currentKey}`;
 
             if (timeStr === aSt && lastAlarmKey !== sK) {
-                const skip = (startAlarmOffset === 0); pendingAlarm = { key: sK, title: `${slot.name} 시작!`, msg: `이번 시간은 [${sub}] 입니다.`, tts: startAlarmMessage, skip: skip, priority: 2 };
+                const skip = (startAlarmOffset === 0);
+                // 점심은 "수업이 시작되었습니다" 대신 점심 안내
+                pendingAlarm = isLunch
+                    ? { key: sK, title: '점심시간!', msg: '맛있게 먹고 오세요.', tts: '점심시간입니다. 맛있게 먹고 오세요.', skip: skip, priority: 2 }
+                    : { key: sK, title: `${slot.name} 시작!`, msg: `이번 시간은 [${sub}] 입니다.`, tts: startAlarmMessage, skip: skip, priority: 2 };
             } else if (timeStr === aEn && lastAlarmKey !== eK) {
                 const isC = (i === lp); const msg = isC ? closingAlarmMessage : endAlarmMessage; const title = isC ? '오늘 하루 끝!' : `${slot.name} 종료!`; const skip = (endAlarmOffset === 0); 
-                if (!pendingAlarm || pendingAlarm.priority < 1) { pendingAlarm = { key: eK, title: title, msg: isC ? '하교 시간입니다.' : '쉬는 시간입니다.', tts: msg, skip: skip, priority: 1 }; }
+                if (!pendingAlarm || pendingAlarm.priority < 1) {
+                    pendingAlarm = (isLunch && !isC)
+                        ? { key: eK, title: '점심시간 끝!', msg: '점심시간이 끝났습니다.', tts: '점심시간이 끝났습니다.', skip: skip, priority: 1 }
+                        : { key: eK, title: title, msg: isC ? '하교 시간입니다.' : '쉬는 시간입니다.', tts: msg, skip: skip, priority: 1 };
+                }
             }
         }
         if (pendingAlarm) { showAlarm(pendingAlarm.title, pendingAlarm.msg, false, pendingAlarm.tts, pendingAlarm.skip); lastAlarmKey = pendingAlarm.key; }
@@ -1494,9 +1589,12 @@ Object.assign(window, {
     renderSavedBoards,
     viewSavedBoard,
     deleteSavedBoard,
+    loadViewedBoard,
+    setNoticeAutoArchive,
     applyToolVisibility,
     updateSubjectFast,
     toggleMutePeriod,
+    ringBellsToday,
     getSubjectColorClasses,
     renderTimetable,
     openWeather,

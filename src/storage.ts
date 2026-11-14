@@ -35,6 +35,8 @@ class AppStorage {
   private timers = new Map<Bucket, number>();
   private saving = new Map<Bucket, Promise<void>>();
   private ready = false;
+  /** 백업에서 복원하는 동안: 메모리의 옛 내용을 파일에 쓰지 않음 (복원한 파일을 덮어쓰지 않게) */
+  private suspended = false;
   /** 저장 실패 시 화면에 알리기 위한 콜백 (main.ts 가 설정) */
   onError: ((msg: string) => void) | null = null;
 
@@ -126,6 +128,7 @@ class AppStorage {
 
   // ---------- 파일 저장 ----------
   private markDirty(b: Bucket) {
+    if (this.suspended) return;
     if (!isTauri()) {
       // 브라우저 폴백: 즉시 localStorage 반영
       for (const [k, v] of this.data) if (bucketOf(k) === b) localStorage.setItem(k, v);
@@ -147,7 +150,7 @@ class AppStorage {
   }
 
   async flush(b: Bucket): Promise<void> {
-    if (!isTauri() || !this.dirty.has(b)) return;
+    if (this.suspended || !isTauri() || !this.dirty.has(b)) return;
     // 이미 저장 중이면 끝난 뒤 다시
     const prev = this.saving.get(b);
     if (prev) { await prev; return this.flush(b); }
@@ -169,6 +172,15 @@ class AppStorage {
   }
 
   hasUnsaved() { return this.dirty.size > 0 || this.saving.size > 0; }
+
+  /** 파일 저장을 멈춤 (복원 직전). 이후 화면을 다시 읽을 때까지 아무것도 쓰지 않음 */
+  suspend() {
+    this.suspended = true;
+    for (const t of this.timers.values()) window.clearTimeout(t);
+    this.timers.clear();
+    this.dirty.clear();
+  }
+  resume() { this.suspended = false; }
 }
 
 export const storage = new AppStorage();

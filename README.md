@@ -2,7 +2,7 @@
 
 기존 일렉트론 버전(v1.6.11)을 Tauri 2 + Vite + TypeScript로 옮기는 프로젝트입니다.
 
-## 현재 상태: v2.6.0
+## 현재 상태: v2.7.0
 - 1단계: Tauri 창에서 기존 앱 실행
 - 2단계:
   - 인라인 스크립트 → `src/legacy-app.js` 로 분리 (기능 변경 없음)
@@ -106,7 +106,7 @@
     편집 영역(`#notepad-editor`)은 글자 영역 바깥 여백에 놓아도 사진이 들어감 (`src/board-editor.ts` insertDroppedFiles)
   - 열 수 없는 사진(아이폰 HEIC, 손상된 파일)은 `img.onload` 가 오지 않아 조용히 끝났음 → `onerror` 에서 이유를 안내.
     윈도우에 HEIF 확장이 없으면 .heic 의 형식(type)이 비어 오므로 확장자로도 사진 여부를 판단
-- v2.6.0 (지금): 사진 기능 강화
+- v2.6.0: 사진 기능 강화
   - **사진을 파일로 저장** (`src/board-images.ts`, Rust `save_image`/`read_image`/`cleanup_images`/`snapshot_store_once`, `sbimg` 프로토콜):
     - 사진은 `data/images/<내용 SHA-256 앞 32자>.<jpg|png|gif|webp>` 에 한 번만 저장 (같은 사진은 같은 이름 → 한 장). 바이트는 invoke 원시 본문 + `x-image-name` 머리글로 보냄
     - HTML 에는 `<img src="sbimg 주소" data-file="이름">`. 주소는 `convertFileSrc(이름, "sbimg")` — 윈도우 `https://sbimg.localhost/…`(useHttpsScheme), macOS·리눅스 `sbimg://localhost/…`.
@@ -120,6 +120,32 @@
     크게 보기는 사진 도구 버튼 또는 사진 두 번 누르기(판서·알림·보관 기록 보기), 누르거나 ESC 로 닫힘
   - **±10% 버튼 버그**: TipTap 크기 조절 노드뷰는 처음 그릴 때만 width/height 를 화면에 적용해서, 속성이 바뀌어도 화면 크기는 그대로였음 →
     `BoardImage.addNodeView` 에서 update 때마다 맞춤
+- v2.7.0 (지금): 버그 9건 수정 + 창 위치 기억 + 학사일정·휴일 무음 + 급식 날짜 이동 + 기록 불러오기 + 알림장 자동 보관 + 백업·복원
+  - 버그 수정
+    - **되돌리기 덮어쓰기**: `setHTML`(시작·판서↔알림 전환)이 되돌리기 기록에 남아, 알림으로 바꾼 뒤 Ctrl+Z 한 번에 판서 내용이 돌아와
+      알림장으로 저장됐음 → 내용을 바꿀 때 `EditorState.create` 로 기록을 비움 (`src/board-editor.ts`)
+    - **도구 메뉴 무한 반복**: `fit.ts` 가 바꾼 style 을 자기 MutationObserver 가 다시 잡아 매 프레임 재계산 → 계산 끝에 `takeRecords()` 로 버림
+    - 점심 시작에 "수업이 시작되었습니다" 대신 점심 안내, 수업이 하나도 없는 날(주말)엔 점심 칸만으로 종이 울리지 않음 (`checkAlarms`)
+    - '내 MP3' + 파일 없음(기본음) → 경고창 대신 `public/alarm.mp3` 재생
+    - 판서 배경색: 시작할 때 모드별 키(`smartBoardNotepadBg_board`)를 읽음
+    - 날짜가 바뀌면(`updateClock` 의 `onDayChanged`) 시간표 다시 그리기·알림장 자동 보관·학사일정 새로 받기
+    - 교시 칸 종 끄기/켜기 전에 확인, 보관 기록 삭제 버튼을 hover 없이도 표시
+    - 미세먼지: PM2.5 는 자체 기준(15/35/75)으로, 머리글은 PM10·PM2.5 중 나쁜 쪽 (`src/weather.ts` worstDustGrade)
+  - **창 위치·크기 기억** (`tauri-plugin-window-state`, main 창만): 위치·크기·최대화를 `<설정 폴더>/.window-state.json` 에.
+    저장된 위치가 지금 연결된 모니터에 걸치지 않으면(모니터를 뺀 경우) 위치는 되살리지 않음.
+    창은 `visible:false` 로 만들고 플러그인이 위치를 되살린 뒤 보여 줌(깜빡임 없음). JS 가 시작하자마자 숨겨져 있으면 보이게(안전장치),
+    옮기거나 크기를 바꾸면 1.5초 뒤 저장(앱을 닫지 않고 PC 를 꺼도 남음, 권한 `window-state:allow-save-window-state`)
+  - **NEIS 공용** (`src/neis.ts`): 인증키(선택, `smartBoardNeisKey`)가 있으면 KEY·pSize=1000. 급식 창 학교 검색 아래에서 입력
+  - **학사일정·휴일 자동 무음** (`src/school-calendar.ts`): SchoolSchedule 을 월 단위로 받아(키가 없으면 평일 주 단위 + 오늘 하루 따로) 저장(12시간 캐시).
+    수업공제일 구분이 휴업일·공휴일이면 `checkAlarms` 가 수업 종·퇴근 알람을 건너뛰고 시간표에 '오늘은 쉬는 날' 표시.
+    '오늘은 종 울리기'로 그날만 해제(`smartBoardHolidayOverride`). 달력 창은 날짜 칸에 일정, 아래에 이달 일정 목록 (토요휴업일은 숨김)
+  - **급식 날짜 이동** (`src/lunch.ts`): ◀ ▶(주말 건너뜀)·오늘·하루/이번 주(월~금, 중식 `MMEAL_SC_CODE=2`). 하루 보기도 중식을 골라 표시
+  - **기록 불러와서 고치기** (`loadViewedBoard`): [판서]→판서, [알림]→알림, 그 밖은 지금 화면으로. 지금 내용이 있으면 확인 후 목록에 자동 보관하고 바꿈
+  - **알림장 날짜별 자동 보관** (`autoArchiveNotice`): 날짜가 바뀌면 전날 알림장을 "[알림] 날짜 (자동 보관)"으로. 내용은 그대로 두고, 같은 내용은 다시 보관하지 않음(해시).
+    기록 목록 창에서 끄기(`smartBoardNoticeAutoArchive`). 시작 때 호출은 `currentBoardMode` 선언 뒤에 실행되도록 setTimeout
+  - **데이터 백업·복원** (`src/backup.ts`, Rust `export_backup`/`import_backup`, `zip` 크레이트): 저장 파일 json·images·alarm 을 zip 하나로.
+    복원은 백업 안의 json 을 먼저 모두 검사한 뒤, 지금 데이터를 `<앱 데이터>/backups/before-restore-<시각>.zip` 으로 남기고 교체 → 화면 다시 읽기.
+    교체 중에는 `storage.suspend()` 로 메모리의 옛 내용이 파일을 덮어쓰지 않게 함. 창 위치·로그인 정보는 넣지 않음
 
 ## 개발 PC 준비 (macOS, 한 번만)
 ```bash

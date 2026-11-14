@@ -543,6 +543,22 @@
                         </div>
                     </div>
 
+                    <!-- 데이터 백업·복원 (2.7.0, src/backup.ts) -->
+                    <div class="border-t border-slate-200 pt-6">
+                        <h3 class="font-bold text-slate-800 text-lg flex items-center mb-2">
+                            <i data-lucide="archive" class="mr-2 text-brand-500"></i> 데이터 백업·복원
+                        </h3>
+                        <p class="text-sm text-slate-500 mb-4">시간표·알람·판서·알림·보관 기록·사진·설정을 파일 하나로 저장합니다. 교실이나 PC를 옮길 때 새 PC에서 '백업에서 복원'으로 그 파일을 고르세요.</p>
+                        <div class="flex gap-3 flex-wrap">
+                            <button onclick="window.dataBackup.exportDialog()" class="px-5 py-2.5 bg-brand-50 hover:bg-brand-100 text-brand-700 rounded-lg font-bold transition flex items-center shadow-sm border border-brand-100">
+                                <i data-lucide="download" class="w-4 h-4 mr-2 pointer-events-none"></i> 백업 파일 만들기
+                            </button>
+                            <button onclick="window.dataBackup.importDialog()" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold transition flex items-center shadow-sm border border-slate-200">
+                                <i data-lucide="upload" class="w-4 h-4 mr-2 pointer-events-none"></i> 백업에서 복원
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- 데이터 초기화 섹션 -->
                     <div class="border-t border-slate-200 pt-6">
                         <h3 class="font-bold text-slate-800 text-lg flex items-center mb-4">
@@ -782,20 +798,22 @@
 
     <!-- CALENDAR MODAL -->
     <div id="modal-calendar" class="modal fixed inset-0 z-50 items-center justify-center bg-black/60 backdrop-blur-sm">
-        <div class="bg-white rounded-3xl shadow-2xl w-[25rem] flex flex-col overflow-hidden">
+        <div class="bg-white rounded-3xl shadow-2xl w-[44rem] max-h-[92vh] flex flex-col overflow-hidden">
             <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
-                <h2 class="text-xl font-bold flex items-center text-slate-800"><i data-lucide="calendar-days" class="mr-2 text-brand-500"></i> 달력</h2>
+                <h2 class="text-xl font-bold flex items-center text-slate-800"><i data-lucide="calendar-days" class="mr-2 text-brand-500"></i> 달력 · 학사일정</h2>
                 <button onclick="closeModal('modal-calendar')" class="p-2 hover:bg-slate-200 rounded-full transition"><i data-lucide="x" class="w-5 h-5 pointer-events-none"></i></button>
             </div>
-            <div class="p-6 flex flex-col">
-                <div class="flex justify-between items-center mb-6 shrink-0">
+            <div class="p-6 flex flex-col min-h-0 overflow-y-auto">
+                <div class="flex justify-between items-center mb-4 shrink-0">
                     <button onclick="changeCalendarMonth(-1)" class="p-2 hover:bg-slate-100 rounded-xl transition"><i data-lucide="chevron-left"></i></button>
                     <h3 id="calendar-month-year" class="text-3xl font-bold text-slate-800"></h3>
                     <button onclick="changeCalendarMonth(1)" class="p-2 hover:bg-slate-100 rounded-xl transition"><i data-lucide="chevron-right"></i></button>
                 </div>
-                <div class="w-full shrink-0 h-[18.75rem]">
+                <div class="w-full shrink-0">
                     <div id="calendar-grid" class="grid grid-cols-7 gap-1 text-center w-full"></div>
                 </div>
+                <div id="calendar-events" class="mt-4 max-h-40 overflow-y-auto text-base shrink-0"></div>
+                <div id="calendar-status" class="text-xs font-bold mt-2 text-slate-400"></div>
                 <div class="mt-4 text-center shrink-0 border-t border-slate-100 pt-4">
                     <button onclick="resetCalendarToToday()" class="px-6 py-2 bg-brand-50 hover:bg-brand-100 text-brand-700 font-bold rounded-xl transition text-base">오늘로 이동</button>
                 </div>
@@ -807,7 +825,7 @@
     <div id="modal-lunch" class="modal fixed inset-0 z-50 items-center justify-center bg-black/60 backdrop-blur-sm">
         <div class="bg-white rounded-3xl shadow-2xl w-[31.25rem] max-h-[90vh] flex flex-col overflow-hidden">
             <div class="px-6 py-4 border-b border-emerald-100 flex justify-between items-center bg-emerald-50 shrink-0">
-                <h2 class="text-xl font-bold flex items-center text-emerald-800"><i data-lucide="utensils" class="mr-2"></i> 오늘의 급식 정보</h2>
+                <h2 class="text-xl font-bold flex items-center text-emerald-800"><i data-lucide="utensils" class="mr-2"></i> 급식 정보</h2>
                 <div class="flex items-center">
                     <button onclick="window.lunch.toggleAllergyPanel()" class="p-2 hover:bg-emerald-200 rounded-full transition mr-1" title="알레르기 표시 설정"><i data-lucide="triangle-alert" class="w-5 h-5 text-emerald-800 pointer-events-none"></i></button>
                     <button onclick="toggleSchoolSelector()" class="p-2 hover:bg-emerald-200 rounded-full transition mr-2" title="학교 변경"><i data-lucide="search" class="w-5 h-5 text-emerald-800 pointer-events-none"></i></button>
@@ -821,6 +839,15 @@
                     <button onclick="searchSchool()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold transition shadow-sm whitespace-nowrap">검색</button>
                 </div>
                 <div id="school-search-results" class="mt-3 flex flex-col gap-2 max-h-40 overflow-y-auto"></div>
+                <details class="mt-3 text-sm">
+                    <summary class="cursor-pointer font-bold text-slate-600">NEIS 인증키 (선택)</summary>
+                    <p class="text-xs text-slate-500 mt-1 mb-2">없어도 됩니다. 넣으면 학교 검색 결과가 5개로 제한되지 않고 학사일정이 빠짐없이 보입니다. (open.neis.go.kr 가입 → 인증키 신청, 무료)</p>
+                    <div class="flex gap-2">
+                        <input type="text" id="neis-key-input" placeholder="인증키 붙여넣기" class="flex-1 p-2 rounded-xl border border-slate-300 font-bold outline-none focus:ring-2 focus:ring-emerald-500 text-sm" onkeydown="if(event.key==='Enter') window.lunch.saveNeisKey()">
+                        <button onclick="window.lunch.saveNeisKey()" class="bg-slate-600 hover:bg-slate-700 text-white px-3 py-2 rounded-xl font-bold transition shadow-sm whitespace-nowrap">저장</button>
+                    </div>
+                    <span id="neis-key-msg" class="text-xs text-emerald-600 font-bold"></span>
+                </details>
             </div>
             <div id="allergy-panel" class="hidden bg-rose-50 border-b border-rose-100 p-4 shrink-0">
                 <div class="flex items-center justify-between mb-2">
@@ -950,6 +977,10 @@
         <div class="bg-white rounded-3xl shadow-2xl w-[31.25rem] max-h-[80vh] flex flex-col overflow-hidden">
             <div class="px-6 py-4 border-b border-indigo-100 flex justify-between items-center bg-indigo-50 shrink-0">
                 <h2 class="text-xl font-bold text-indigo-800 flex items-center"><i data-lucide="folder-open" class="mr-2"></i>저장된 기록 목록</h2>
+                <label class="ml-auto mr-3 flex items-center gap-2 text-sm font-bold text-indigo-700 cursor-pointer select-none" title="날짜가 바뀌면 전날 알림장을 이 목록에 자동으로 넣습니다">
+                    <input type="checkbox" id="toggle-notice-autoarchive" class="w-4 h-4 accent-indigo-600" onchange="setNoticeAutoArchive(this.checked)" checked>
+                    알림장 날짜별 자동 보관
+                </label>
                 <button onclick="closeModal('modal-saved-list')" class="p-2 hover:bg-indigo-200 rounded-full transition"><i data-lucide="x" class="w-5 h-5 text-indigo-800 pointer-events-none"></i></button>
             </div>
             <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 bg-slate-100/50" id="saved-boards-container"></div>
@@ -964,7 +995,12 @@
                     <i data-lucide="file-text" class="mr-2 text-indigo-500"></i> 기록 보기
                     <span id="viewer-date" class="ml-4 text-sm font-medium text-slate-500 bg-white px-3 py-1 rounded-full border"></span>
                 </h2>
-                <button onclick="closeModal('modal-board-viewer')" class="p-2 hover:bg-slate-200 rounded-full transition"><i data-lucide="x" class="w-6 h-6 pointer-events-none"></i></button>
+                <div class="flex items-center gap-2">
+                    <button onclick="loadViewedBoard()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition shadow-sm flex items-center" title="이 기록을 판서·알림 화면으로 가져와 이어서 고칩니다">
+                        <i data-lucide="file-pen-line" class="w-5 h-5 mr-1.5 pointer-events-none"></i>불러와서 고치기
+                    </button>
+                    <button onclick="closeModal('modal-board-viewer')" class="p-2 hover:bg-slate-200 rounded-full transition"><i data-lucide="x" class="w-6 h-6 pointer-events-none"></i></button>
+                </div>
             </div>
             <div id="viewer-content" class="flex-1 p-8 overflow-y-auto text-slate-800 bg-white" style="line-height: 1.6; font-size: 32px; font-family: 'Jua', sans-serif;"></div>
         </div>
