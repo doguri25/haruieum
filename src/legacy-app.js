@@ -229,10 +229,16 @@ export function startLegacyApp() {
             }
         }
 
+        // 2.8.1: 마이크 준비(권한 확인)를 기다리는 동안 다시 누르거나 닫으면 마이크가 두 개 켜지거나 숨은 채로 계속 측정됐음
+        let noiseStarting = false;
         async function startNoiseMeter() {
-            if(isNoiseRunning) return;
+            if(isNoiseRunning || noiseStarting) return;
+            noiseStarting = true;
+            const panel = document.getElementById('floating-noise-meter');
             try {
-                noiseStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                if (panel.classList.contains('hidden')) { stream.getTracks().forEach(t => t.stop()); return; } // 기다리는 사이 닫힘
+                noiseStream = stream;
                 noiseAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 noiseAnalyser = noiseAudioCtx.createAnalyser();
                 noiseAnalyser.fftSize = 256;
@@ -244,7 +250,9 @@ export function startLegacyApp() {
                 measureNoiseLoop();
             } catch(e) {
                 alert("마이크 접근 권한을 허용해야 소음 측정이 가능합니다.");
-                toggleNoiseMeter(); 
+                if (!panel.classList.contains('hidden')) toggleNoiseMeter(); 
+            } finally {
+                noiseStarting = false;
             }
         }
 
@@ -357,8 +365,10 @@ export function startLegacyApp() {
             noiseRule1Text = document.getElementById('noise-rule1-text').value;
             noiseRule2Count = parseInt(document.getElementById('noise-rule2-count').value) || 5;
             noiseRule2Text = document.getElementById('noise-rule2-text').value;
-            noiseRule3Count = parseInt(document.getElementById('noise-rule3-count').value) || 10;
-            noiseRule3Text = document.getElementById('noise-rule3-text').value;
+ 
+            // 2.8.1: 세 번째 규칙 칸은 화면에 없어서, 예전엔 여기서 오류가 나 규칙이 저장되지 않았음
+            const r3c = document.getElementById('noise-rule3-count'); if (r3c) noiseRule3Count = parseInt(r3c.value) || 10;
+            const r3t = document.getElementById('noise-rule3-text'); if (r3t) noiseRule3Text = r3t.value;
             
             storage.setItem('sbNoiseR1C', noiseRule1Count);
             storage.setItem('sbNoiseR1T', noiseRule1Text);
@@ -491,7 +501,10 @@ export function startLegacyApp() {
             boardEditor.insertTable(r, c);
         }
 
+ 
         function closeModal(id) { 
+            // 2.8.1: 알람 팝업은 closeAlarm 으로 (예전엔 바깥을 눌러 닫으면 숨은 카운트다운이 남아, 나중에 다른 소리를 끊었음)
+            if (id === 'modal-alarm') { closeAlarm(); return; }
             const m = document.getElementById(id); 
             if(m) { 
                 m.classList.remove('active'); 
@@ -635,7 +648,16 @@ export function startLegacyApp() {
 
         function toggleFullscreen() { let e = document.documentElement; if (!document.fullscreenElement) { if (e.requestFullscreen) e.requestFullscreen().catch(()=>{}); else if (e.webkitRequestFullscreen) e.webkitRequestFullscreen(); } else { if (document.exitFullscreen) document.exitFullscreen().catch(()=>{}); } }
         function applyLunchPosition() { let p = 1; for(let i=0; i<7; i++) { if(i === lunchPos) timeSlots[i].name = '점심'; else { timeSlots[i].name = `${p}교시`; p++; } } }
-        function handleLunchPosChange(val) { lunchPos = parseInt(val); applyLunchPosition(); renderTimetable(); renderSettingsInputs(); }
+        // 2.8.1: 점심 순서를 고르면 설정 창의 교시 이름만 미리 바꿈. 예전엔 입력 중이던 시간표·시간 칸이 저장된 값으로 되돌아가고,
+        // 저장하지 않고 닫아도 오늘 시간표·종에는 바로 적용돼 버렸음. 실제 적용은 '저장 및 닫기'(saveMainSettings)
+        function handleLunchPosChange(val) {
+            const keep = {};
+            document.querySelectorAll('#settings-schedule-grid input, #settings-time-list input').forEach(i => { if (i.id) keep[i.id] = i.value; });
+            const prev = lunchPos;
+            lunchPos = parseInt(val); applyLunchPosition(); renderSettingsInputs();
+            lunchPos = prev; applyLunchPosition();
+            Object.entries(keep).forEach(([id, v]) => { const i = document.getElementById(id); if (i) i.value = v; });
+        }
         function initClock() {
             // 창이 가려지면 웹뷰의 setInterval 이 느려지므로 Rust 가 보내는 1초 tick 을 씀 (브라우저에서는 setInterval)
             if (window.smartboardHost && window.smartboardHost.onTick) window.smartboardHost.onTick(updateClock);
@@ -650,7 +672,8 @@ export function startLegacyApp() {
             document.getElementById('current-date-text').innerText = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 (${days[now.getDay()]}요일)`; 
             updateTimetableHighlight(now); 
             // tick 이 1분 넘게 끊겼다면(절전·백그라운드) 그 사이의 분을 순서대로 확인해 놓친 알람을 울림 (최대 10분)
-            if (lastTickTime && now - lastTickTime > 90000 && now - lastTickTime < 10 * 60000) {
+            // (2.8.1: 기준을 90초 → 60초로. 60~90초 끊기면 그 사이의 분 하나를 건너뛰어 종이 안 울릴 수 있었음. 같은 분이 두 번 울리지는 않음)
+            if (lastTickTime && now - lastTickTime > 60000 && now - lastTickTime < 10 * 60000) {
                 for (let t = new Date(lastTickTime.getTime() + 60000); t < now; t = new Date(t.getTime() + 60000)) checkAlarms(t);
             }
             // 날짜가 바뀌면(켜 둔 채 자정을 넘기거나 절전에서 깨어남) 오늘 시간표로 다시 그림.
@@ -757,7 +780,8 @@ export function startLegacyApp() {
             const now = new Date(); const ds = `${now.getFullYear()}.${now.getMonth()+1}.${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`; 
             let c = '';
             if (currentSaveTarget === 'board') { c = boardEditor.getHTML(); } 
-            else if (currentSaveTarget === 'popupnote') { c = document.getElementById('popup-note-textarea').value.trim().replace(/\n/g, '<br>'); }
+            // 2.8.1: 팝업노트 글은 HTML 이 아니므로 escape 후 줄바꿈만 <br> (예전엔 '<3단원>' 같은 글이 사라지거나 태그로 해석됐음)
+            else if (currentSaveTarget === 'popupnote') { c = escHtml(document.getElementById('popup-note-textarea').value.trim()).replace(/\n/g, '<br>'); }
             savedBoards.unshift({ id: Date.now(), title: t, date: ds, content: c }); 
             storage.setItem('smartBoardSavedData', JSON.stringify(savedBoards)); 
             closeModal('modal-save-board');
@@ -904,7 +928,8 @@ export function startLegacyApp() {
         function openCalendar() { currentCalendarDate = new Date(); renderCalendar(); document.getElementById('modal-calendar').classList.add('active'); }
         // 2.7.0: 학사일정(휴업일·행사)을 함께 보여 주는 달력 (src/school-calendar.ts)
         function renderCalendar() { window.schoolCalendar.renderMonth(currentCalendarDate); }
-        function changeCalendarMonth(o) { currentCalendarDate.setMonth(currentCalendarDate.getMonth() + o); renderCalendar(); }
+        // 2.8.1: 1일 기준으로 이동 (예전엔 31일에 ▶ 를 누르면 2월을 건너뛰거나 ◀ 가 안 움직였음)
+        function changeCalendarMonth(o) { currentCalendarDate = new Date(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth() + o, 1); renderCalendar(); }
         function resetCalendarToToday() { currentCalendarDate = new Date(); renderCalendar(); }
 
                                         
@@ -952,7 +977,14 @@ export function startLegacyApp() {
             } catch(e) { console.error(e); } 
         }
 
-        function previewMelody() { const sm = parseInt(document.getElementById('setting-alarm-melody').value); playAlarmMelody(sm, null, true); }
+        // 2.8.1: 미리듣기는 지금 창에 보이는 파일로 (예전엔 저장된 파일·기본음이 나와 '새 파일이 안 된다'고 보였음)
+        function previewMelody() {
+            const sm = parseInt(document.getElementById('setting-alarm-melody').value);
+            const prev = customMp3FileName;
+            const inp = document.getElementById('input-custom-mp3');
+            if (sm === 4 && inp) customMp3FileName = inp.value.trim();
+            try { playAlarmMelody(sm, null, true); } finally { customMp3FileName = prev; }
+        }
 
         function playAlarmMelody(type, ttsText, isPreview = false) { 
             if(globalVolume === 0) { if (ttsText && !isPreview) playTTS(ttsText); return 5; }
@@ -1298,6 +1330,9 @@ export function startLegacyApp() {
             if (msg) { msg.innerText = `${min}분 남았어요!`; msg.classList.remove('hidden'); clearTimeout(msg._t); msg._t = setTimeout(() => msg.classList.add('hidden'), 6000); }
             const d = document.getElementById('timer-display');
             if (d) { d.classList.add('animate-pulse', 'text-red-500'); setTimeout(() => d.classList.remove('animate-pulse', 'text-red-500'), 6000); }
+            // 2.8.1: 교시 종(알람)이 울리거나 안내 중이면 소리는 내지 않음 — 예전엔 미리 알림이 종소리와 안내 음성을 끊어 버렸음
+            const alarmOn = document.getElementById('modal-alarm')?.classList.contains('active');
+            if (isAudioPlaying || alarmOn || (window.speechSynthesis && window.speechSynthesis.speaking)) return;
             playAttentionBell();
             setTimeout(() => playTTS(`${min}분 남았습니다.`), 1200);
         }
@@ -1508,6 +1543,14 @@ function toggleActivityMenu() {
     if (menu.classList.contains('hidden')) {
         menu.classList.remove('hidden');
         menu.classList.add('flex');
+        // 2.8.1: 위젯을 화면 위쪽에 둔 경우 펼친 메뉴가 화면 밖으로 나가지 않게
+        // (펼치는 효과로 처음엔 작게 그려지므로 효과가 끝난 뒤 한 번 더 확인)
+        if (window.refitFloating) {
+            const refit = () => window.refitFloating('btn-tool-activity');
+            requestAnimationFrame(refit);
+            menu.addEventListener('animationend', refit, { once: true });
+            setTimeout(refit, 400);
+        }
     } else {
         menu.classList.add('hidden');
         menu.classList.remove('flex');

@@ -172,8 +172,11 @@ export async function fetchDust(r: Region): Promise<Dust | null> {
   const valid = items.filter((i) => i.pm10Value && i.pm10Value !== "-");
   if (!valid.length) return null;
   // 시/군/구 이름(홍성군 → 홍성)이 들어간 측정소를 우선, 없으면 시/도 평균
+  // 2.8.1: '동구'→'동' 처럼 한 글자가 되면 '…동' 측정소가 아무거나 걸렸음 → 한 글자면 이름이 정확히 같은 측정소만
   const short = r.sigungu.replace(/(특별자치)?(시|군|구)$/, "");
-  const hit = valid.find((i) => i.stationName?.includes(short));
+  const hit = short.length >= 2
+    ? valid.find((i) => i.stationName?.includes(short))
+    : valid.find((i) => i.stationName === r.sigungu || i.stationName === short);
   if (hit) return { pm10: Number(hit.pm10Value), pm25: hit.pm25Value && hit.pm25Value !== "-" ? Number(hit.pm25Value) : null, station: hit.stationName, time: hit.dataTime };
   const avg = (k: string) => { const v = valid.map((i) => Number(i[k])).filter((x) => !isNaN(x) && x > 0); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
   return { pm10: avg("pm10Value"), pm25: avg("pm25Value"), station: `${r.dust} 평균`, time: valid[0].dataTime };

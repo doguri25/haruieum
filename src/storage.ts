@@ -37,6 +37,10 @@ class AppStorage {
   private ready = false;
   /** 백업에서 복원하는 동안: 메모리의 옛 내용을 파일에 쓰지 않음 (복원한 파일을 덮어쓰지 않게) */
   private suspended = false;
+  /** 2.8.1: 원본도 .bak 도 읽지 못한 저장소. 이번 실행에서는 저장하지 않음 (읽지 못한 진짜 파일을 덮어쓰지 않게) */
+  private blocked = new Set<Bucket>();
+  /** 저장 파일을 읽다 문제가 있었음 → '처음 실행'으로 보고 예전 데이터를 가져와 덮어쓰지 않게 */
+  private loadProblem = false;
   /** 저장 실패 시 화면에 알리기 위한 콜백 (main.ts 가 설정) */
   onError: ((msg: string) => void) | null = null;
 
@@ -63,7 +67,8 @@ class AppStorage {
     }
 
     // 처음 실행이면 예전 데이터를 가져옴: v1(일렉트론) 파일 → 없으면 브라우저 localStorage
-    if (!loadedAny) {
+    // (파일을 읽지 못한 경우는 처음 실행이 아님 — 가져오기로 덮어쓰지 않음)
+    if (!loadedAny && !this.loadProblem) {
       let imported = 0;
       try {
         const v1 = await invoke<string>("load_v1_data");
@@ -83,6 +88,8 @@ class AppStorage {
       if (imported) { BUCKETS.forEach((b) => this.dirty.add(b)); await this.flushAll(); }
     }
     this.ready = true;
+    // .bak 에서 복구한 저장소는 바로 본 파일에 다시 씀 (2.8.1)
+    if (this.dirty.size) void this.flushAll();
   }
 
   private async loadBucket(b: Bucket): Promise<Record<string, string> | null> {
@@ -92,20 +99,29 @@ class AppStorage {
       if (!obj || typeof obj !== "object") throw new Error("형식 오류");
       return obj as Record<string, string>;
     };
-    try {
-      return parse(await invoke<string>("load_store", { name: b }));
-    } catch (e) {
-      console.warn(`${b}.json 을 읽을 수 없어 백업을 시도합니다:`, e);
-      try {
-        const obj = parse(await invoke<string>("load_store_backup", { name: b }));
-        if (obj) { console.warn(`${b}.json.bak 에서 복구했습니다.`); this.dirty.add(b); }
-        return obj;
-      } catch (e2) {
-        console.error(`${b} 백업도 읽을 수 없습니다:`, e2);
-        this.onError?.(`${b} 저장 파일을 읽을 수 없어 비워진 상태로 시작합니다.`);
-        return null;
-      }
+    // 2.8.1: '읽지 못함'(잠김·권한 등)과 '내용이 깨짐'을 나눠 처리
+    let text: string | null = null, readErr: unknown = null;
+    try { text = await invoke<string>("load_store", { name: b }); } catch (e) { readErr = e; }
+    if (text !== null) {
+      try { return parse(text); } catch (e) { console.warn(`${b}.json 이 손상되어 백업을 시도합니다:`, e); }
+    } else {
+      console.warn(`${b}.json 을 읽을 수 없어 백업을 시도합니다:`, readErr);
     }
+    try {
+      const bak = parse(await invoke<string>("load_store_backup", { name: b }));
+      if (bak) { console.warn(`${b}.json.bak 에서 복구했습니다.`); this.dirty.add(b); return bak; }
+    } catch (e) { console.error(`${b} 백업도 읽을 수 없습니다:`, e); }
+    this.loadProblem = true;
+    if (readErr) {
+      // 파일은 있는데 읽지 못함 → 빈 내용으로 저장하면 진짜 파일이 사라지므로 이번 실행에서는 저장하지 않음
+      this.blocked.add(b);
+      this.onError?.(`${b} 저장 파일을 읽을 수 없습니다. 원본을 지키려고 이번 실행에서는 이 항목을 저장하지 않습니다. 앱을 다시 시작해 주세요.`);
+      return null;
+    }
+    // 내용이 깨졌고 백업도 없음 → 깨진 파일은 <이름>.corrupt.json 으로 남겨 두고 빈 상태로 시작
+    try { await invoke("snapshot_store_once", { name: b, tag: "corrupt" }); } catch { /* 남기지 못해도 계속 */ }
+    this.onError?.(`${b} 저장 파일이 손상되어 비워진 상태로 시작합니다. (원본은 ${b}.corrupt.json 으로 남겨 두었습니다)`);
+    return null;
   }
 
   // ---------- localStorage 와 같은 동기 API ----------
@@ -150,7 +166,7 @@ class AppStorage {
   }
 
   async flush(b: Bucket): Promise<void> {
-    if (this.suspended || !isTauri() || !this.dirty.has(b)) return;
+    if (this.suspended || this.blocked.has(b) || !isTauri() || !this.dirty.has(b)) return;
     // 이미 저장 중이면 끝난 뒤 다시
     const prev = this.saving.get(b);
     if (prev) { await prev; return this.flush(b); }
@@ -180,7 +196,11 @@ class AppStorage {
     this.timers.clear();
     this.dirty.clear();
   }
-  resume() { this.suspended = false; }
+  /** rewrite: 복원이 중간에 실패했을 때 — 메모리에 있는 (복원 전) 내용을 모두 다시 써서 파일을 되살림 */
+  resume(rewrite = false) {
+    this.suspended = false;
+    if (rewrite && isTauri()) { BUCKETS.forEach((b) => this.dirty.add(b)); void this.flushAll(); }
+  }
 }
 
 export const storage = new AppStorage();

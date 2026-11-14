@@ -50,7 +50,8 @@ function render() {
   (el("qr-actions") as HTMLElement | null)?.classList.toggle("invisible", !current);
   if (!text) { out.innerHTML = `<div class="text-slate-300 font-bold text-xl">링크나 글을 입력하세요</div>`; if (msg) msg.textContent = ""; return; }
   if (!current) { out.innerHTML = `<div class="text-red-500 font-bold text-xl">글자가 너무 길어 QR 코드를 만들 수 없습니다</div>`; if (msg) msg.textContent = ""; return; }
-  out.innerHTML = current.createSvgTag({ cellSize: 8, margin: MARGIN, scalable: true });
+  // margin 은 픽셀 단위 → 칸 크기(8)를 곱해 2칸 (2.8.1: 예전엔 2px 라 어두운 테마에서 인식이 잘 안 됐음)
+  out.innerHTML = current.createSvgTag({ cellSize: 8, margin: MARGIN * 8, scalable: true });
   const svg = out.querySelector("svg");
   if (svg) { svg.setAttribute("width", "100%"); svg.setAttribute("height", "100%"); svg.setAttribute("shape-rendering", "crispEdges"); }
   if (msg) msg.textContent = /^https?:\/\//i.test(text) ? "학생 태블릿의 카메라로 찍으면 바로 열립니다" : "카메라로 찍으면 이 글이 보입니다";

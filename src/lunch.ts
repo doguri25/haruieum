@@ -163,6 +163,8 @@ async function load() {
   const c = el("modal-lunch-content"); const school = getSchool();
   if (!c || !school) return;
   c.innerHTML = `<h3 class="text-2xl font-bold text-emerald-800 mb-3">${esc(school.name)}</h3>${navHtml()}<div class="flex flex-col items-center py-10"><i data-lucide="loader-2" class="w-10 h-10 text-emerald-500 animate-spin mb-4"></i></div>`;
+  // 2.8.1: 받는 중·실패한 뒤에 알레르기를 바꾸면 이전 날 식단이 새 날짜 이름으로 다시 그려졌음 → 받기 시작할 때 비움
+  shown = null;
   window.lucide?.createIcons();
   const base = { ATPT_OFCDC_SC_CODE: school.officeCode, SD_SCHUL_CODE: school.code };
   const want = `${weekMode}-${ymd(viewDate)}`;
@@ -181,6 +183,7 @@ async function load() {
     }
     await renderMenu();
   } catch (e) {
+    if (want !== `${weekMode}-${ymd(viewDate)}`) return; // 그 사이 다른 날짜로 이동함
     console.error("급식 오류:", e);
     c.innerHTML = `<h3 class="text-2xl font-bold text-emerald-800 mb-3">${esc(school.name)}</h3>${navHtml()}<div class="text-center text-red-500 py-10 font-bold text-xl bg-red-50 rounded-2xl">급식 정보를 가져오는데 실패했습니다.<div class="text-sm text-red-400 mt-2 break-all">${esc(String((e as Error)?.message || e))}</div></div>`;
     window.lucide?.createIcons();
@@ -216,7 +219,7 @@ export async function searchSchool() {
         storage.setItem("smartBoardSchool", JSON.stringify({ code: sch.SD_SCHUL_CODE, officeCode: sch.ATPT_OFCDC_SC_CODE, name: sch.SCHUL_NM }));
         el("school-selector-panel")?.classList.add("hidden");
         void fetchLunch();
-        void window.schoolCalendar?.refreshToday(true);
+        void window.schoolCalendar?.refreshToday(true).then(() => (window as any).renderTimetable?.()); // 휴업일 표시 갱신 (2.8.1)
       };
       c.appendChild(btn);
     });
@@ -232,7 +235,7 @@ export function saveNeisKey() {
   const i = el("neis-key-input") as HTMLInputElement | null; if (!i) return;
   setNeisKey(i.value);
   const m = el("neis-key-msg"); if (m) m.textContent = i.value.trim() ? "저장했습니다." : "인증키를 지웠습니다.";
-  void window.schoolCalendar?.refreshToday(true);
+  void window.schoolCalendar?.refreshToday(true).then(() => (window as any).renderTimetable?.());
 }
 
 declare global {

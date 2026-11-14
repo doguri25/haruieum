@@ -42,28 +42,37 @@ fn check_store_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 파일 이름은 폴더 구분자·상위 이동 금지
+/// 파일 이름은 폴더 구분자·상위 이동·드라이브 지정(C:이름) 금지.
+/// 2.8.1: ':' 도 막음 — 윈도우에서 "C:이름" 은 join 하면 앞 경로를 버리고 C 드라이브의 현재 폴더를 가리킴
 fn check_file_name(name: &str) -> Result<(), String> {
-    if name.is_empty() || name.contains('/') || name.contains('\\') || name.contains("..") {
+    if name.is_empty() || name.contains('/') || name.contains('\\') || name.contains("..") || name.contains(':') {
         return Err(format!("잘못된 파일 이름: {name}"));
     }
     Ok(())
 }
 
-/// <name>.json 내용을 읽음. 없거나 비어 있으면 빈 문자열.
+/// 파일이 없을 때만 빈 문자열. 2.8.1: 그 밖의 오류(글자가 깨짐·다른 프로그램이 잠금 등)는 오류로 돌려줌 —
+/// 예전엔 모두 빈 문자열이라 JS 가 .bak 복구를 시도하지 않았고, 이어서 저장하면 멀쩡한 .bak 까지 덮어썼음
+fn read_text_or_empty(path: &std::path::Path) -> Result<String, String> {
+    match std::fs::read_to_string(path) {
+        Ok(s) => Ok(s),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
+        Err(e) => Err(format!("{}: {e}", path.display())),
+    }
+}
+
+/// <name>.json 내용을 읽음. 없으면 빈 문자열, 읽을 수 없으면 오류
 #[tauri::command]
 fn load_store(app: tauri::AppHandle, name: String) -> Result<String, String> {
     check_store_name(&name)?;
-    let path = data_dir(&app)?.join(format!("{name}.json"));
-    Ok(std::fs::read_to_string(&path).unwrap_or_default())
+    read_text_or_empty(&data_dir(&app)?.join(format!("{name}.json")))
 }
 
 /// <name>.json.bak 내용을 읽음 (원본이 깨졌을 때 JS가 호출)
 #[tauri::command]
 fn load_store_backup(app: tauri::AppHandle, name: String) -> Result<String, String> {
     check_store_name(&name)?;
-    let path = data_dir(&app)?.join(format!("{name}.json.bak"));
-    Ok(std::fs::read_to_string(&path).unwrap_or_default())
+    read_text_or_empty(&data_dir(&app)?.join(format!("{name}.json.bak")))
 }
 
 /// <name>.json 을 원자적으로 저장: tmp 에 쓰고(디스크 동기화) → 기존을 bak 으로 복사 → tmp 를 본 파일로 교체
@@ -80,7 +89,11 @@ fn save_store(app: tauri::AppHandle, name: String, content: String) -> Result<()
         f.write_all(content.as_bytes()).map_err(|e| e.to_string())?;
         f.sync_all().map_err(|e| e.to_string())?;
     }
-    if main.exists() {
+    // 2.8.1: 지금 본 파일이 정상(JSON)일 때만 .bak 으로 남김 — 깨진 본 파일이 멀쩡한 .bak 을 덮어쓰지 않게
+    let main_ok = std::fs::read(&main)
+        .ok()
+        .is_some_and(|b| serde_json::from_slice::<serde_json::Value>(&b).is_ok());
+    if main_ok {
         std::fs::copy(&main, &bak).map_err(|e| e.to_string())?;
     }
     std::fs::rename(&tmp, &main).map_err(|e| e.to_string())?;
@@ -369,6 +382,9 @@ fn import_backup(app: tauri::AppHandle, src: String, stamp: String) -> Result<St
         let target_dir = dir.join(sub);
         std::fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
         let target = target_dir.join(name);
+        if target.parent() != Some(target_dir.as_path()) {
+            continue; // 폴더 밖을 가리키는 이름은 건너뜀 (이중 안전장치)
+        }
         if sub == "images" && target.exists() {
             continue;
         }
@@ -379,19 +395,30 @@ fn import_backup(app: tauri::AppHandle, src: String, stamp: String) -> Result<St
         std::fs::rename(&tmp, &target).map_err(|e| e.to_string())?;
     }
 
-    // 3) 저장 파일 교체: 백업에 없는 저장소는 비움(지난 데이터가 섞이지 않게), .bak 도 지움
+    // 3) 저장 파일 교체. 2.8.1: 새 파일을 모두 임시 파일로 먼저 써 두고(여기서 실패하면 지금 파일은 그대로),
+    //    다 써진 뒤에야 지금 파일을 지우고 바꿈. 예전엔 먼저 지워서 쓰다 실패하면 저장 파일이 사라졌음.
+    //    백업에 없는 저장소는 비움(지난 데이터가 섞이지 않게), .bak 도 지움
+    let mut staged: Vec<(std::path::PathBuf, std::path::PathBuf)> = Vec::new();
+    for (entry_name, bytes) in &stores {
+        let tmp = dir.join(format!("{entry_name}.restore.tmp"));
+        let written = (|| -> Result<(), String> {
+            let mut f = std::fs::File::create(&tmp).map_err(|e| e.to_string())?;
+            f.write_all(bytes).map_err(|e| e.to_string())?;
+            f.sync_all().map_err(|e| e.to_string())
+        })();
+        if let Err(e) = written {
+            for (t, _) in &staged { let _ = std::fs::remove_file(t); }
+            let _ = std::fs::remove_file(&tmp);
+            return Err(format!("복원 파일을 쓰지 못했습니다(지금 데이터는 그대로입니다): {e}"));
+        }
+        staged.push((tmp, dir.join(entry_name)));
+    }
     for name in STORE_NAMES {
         let _ = std::fs::remove_file(dir.join(format!("{name}.json.bak")));
         let _ = std::fs::remove_file(dir.join(format!("{name}.json")));
     }
-    for (entry_name, bytes) in stores {
-        let tmp = dir.join(format!("{entry_name}.tmp"));
-        {
-            let mut f = std::fs::File::create(&tmp).map_err(|e| e.to_string())?;
-            f.write_all(&bytes).map_err(|e| e.to_string())?;
-            f.sync_all().map_err(|e| e.to_string())?;
-        }
-        std::fs::rename(&tmp, dir.join(&entry_name)).map_err(|e| e.to_string())?;
+    for (tmp, target) in staged {
+        std::fs::rename(&tmp, &target).map_err(|e| e.to_string())?;
     }
     Ok(before.to_string_lossy().to_string())
 }
@@ -519,6 +546,15 @@ fn login_memory_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // 2.8.1: 두 번 실행 방지 — 자동 실행 중에 바탕화면 아이콘을 또 누르면 앱이 두 개 떠서 종이 두 번 울리고
+        // 서로의 저장 파일을 덮어썼음. 두 번째 실행은 이미 떠 있는 창을 앞으로 가져오고 바로 끝남 (반드시 첫 플러그인)
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.unminimize();
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }))
         // 6단계: 1초마다 "sb-tick" 이벤트를 보냄.
         // 웹뷰의 setInterval 은 창이 가려지거나 최소화되면 브라우저가 느리게 돌려서
         // 타이머·알람이 늦거나 빠지므로, 시계는 Rust 스레드가 대신 쳐 줍니다.

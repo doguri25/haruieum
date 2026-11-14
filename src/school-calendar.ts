@@ -34,9 +34,14 @@ function cache(): CacheFile {
   } catch { mem = { school, months: {} }; }
   return mem;
 }
-function saveCache(c: CacheFile) {
-  const keys = Object.keys(c.months).sort();
-  for (const k of keys.slice(0, Math.max(0, keys.length - KEEP_MONTHS))) delete c.months[k];
+/** 저장하면서 오래된 달은 버림. 2.8.1: 이번 달에서 먼 달부터 버리고 이번 달·방금 받은 달은 남김
+ *  (예전엔 가장 이른 달부터 버려서, 달력에서 8달 넘게 앞을 넘겨 보면 이번 달 휴일 정보가 지워져 휴일에도 종이 울렸음) */
+function saveCache(c: CacheFile, keep?: string) {
+  const now = new Date(), cur = monthKey(now.getFullYear(), now.getMonth());
+  const idx = (k: string) => Number(k.slice(0, 4)) * 12 + Number(k.slice(4, 6));
+  const far = Object.keys(c.months).filter((k) => k !== cur && k !== keep)
+    .sort((a, b) => Math.abs(idx(b) - idx(cur)) - Math.abs(idx(a) - idx(cur)));
+  while (Object.keys(c.months).length > KEEP_MONTHS && far.length) delete c.months[far.shift()!];
   mem = c;
   storage.setItem(CACHE_KEY, JSON.stringify(c));
 }
@@ -55,21 +60,22 @@ function tidy(events: SchoolEvent[]) {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-async function fetchRange(from: Date, to: Date): Promise<SchoolEvent[]> {
-  const s = getSchool(); if (!s) return [];
+async function fetchRange(from: Date, to: Date, s = getSchool()): Promise<SchoolEvent[]> {
+  if (!s) return [];
   const rows = await neisRows("SchoolSchedule", { ATPT_OFCDC_SC_CODE: s.officeCode, SD_SCHUL_CODE: s.code, AA_FROM_YMD: ymd(from), AA_TO_YMD: ymd(to) });
   return rows.map(toEvent);
 }
 
 /** 한 달 일정 (12시간 안에 받은 것이 있으면 그대로) */
 export async function loadMonth(y: number, m0: number, force = false): Promise<MonthCache | null> {
-  if (!getSchool()) return null;
+  const school = getSchool();
+  if (!school) return null;
   const c = cache(), key = monthKey(y, m0), hit = c.months[key];
   if (hit && !force && Date.now() - hit.fetched < REFRESH_MS) return hit;
   const first = new Date(y, m0, 1), last = new Date(y, m0 + 1, 0);
   let events: SchoolEvent[] = [], partial = false;
   if (getNeisKey()) {
-    events = await fetchRange(first, last);
+    events = await fetchRange(first, last, school);
   } else {
     // 인증키 없이 5건 제한 → 평일(월~금) 주 단위로 나눠 받음
     const ranges: [Date, Date][] = [];
@@ -77,24 +83,28 @@ export async function loadMonth(y: number, m0: number, force = false): Promise<M
       const from = mon < first ? first : mon, fri = addDays(mon, 4), to = fri > last ? last : fri;
       if (from <= to) ranges.push([from, to]);
     }
-    const parts = await Promise.all(ranges.map(([a, b]) => fetchRange(a, b)));
+    const parts = await Promise.all(ranges.map(([a, b]) => fetchRange(a, b, school)));
     partial = parts.some((p) => p.length >= 5);
     events = parts.flat();
   }
+  // 2.8.1: 받는 동안 학교를 바꿨으면 버림 (예전엔 앞 학교의 일정이 새 학교 것으로 저장됐음)
+  if (getSchool()?.code !== school.code) return null;
   const mc: MonthCache = { fetched: Date.now(), events: tidy(events), partial };
-  const c2 = cache(); c2.months[key] = mc; saveCache(c2);
+  const c2 = cache(); c2.months[key] = mc; saveCache(c2, key);
   return mc;
 }
 
 /** 시작할 때·날짜가 바뀔 때·학교를 바꿀 때: 이번 달 일정 + 오늘 하루를 확인 */
 export async function refreshToday(force = false) {
-  if (!getSchool()) return;
+  const school = getSchool();
+  if (!school) return;
   const now = new Date();
   try {
     const mc = await loadMonth(now.getFullYear(), now.getMonth(), force);
     if (mc && !getNeisKey()) {
       // 인증키 없이 받은 주는 5건에서 잘렸을 수 있으므로 오늘 하루는 따로 한 번 더
-      const today = await fetchRange(now, now);
+      const today = await fetchRange(now, now, school);
+      if (getSchool()?.code !== school.code) return;
       const c = cache(), key = monthKey(now.getFullYear(), now.getMonth());
       if (c.months[key]) { c.months[key].events = tidy([...c.months[key].events, ...today]); saveCache(c); }
     }

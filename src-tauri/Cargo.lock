@@ -3788,7 +3788,7 @@ checksum = "f9395f0f0eee849a9b707b2f06bb92a6a422090e2123bb2ef8e87a0e61892a8e"
 
 [[package]]
 name = "smartboard-v2"
-version = "2.8.0"
+version = "2.8.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -3798,6 +3798,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-http",
  "tauri-plugin-opener",
+ "tauri-plugin-single-instance",
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
  "webview2-com",
@@ -4298,6 +4299,22 @@ dependencies = [
  "thiserror 2.0.21",
  "url",
  "windows 0.61.3",
+ "zbus",
+]
+
+[[package]]
+name = "tauri-plugin-single-instance"
+version = "2.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "726b6da0dd5bd1344f84f4108a622c07d01923baacb5c803a605189672c5352f"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "windows-sys 0.61.2",
  "zbus",
 ]
 

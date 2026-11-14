@@ -71,9 +71,12 @@ function setStatus(msg: string, isError = false) {
   s.className = `text-sm font-bold ${isError ? "text-red-600" : "text-slate-500"} ${msg ? "" : "hidden"}`;
 }
 
+let searchSeq = 0;
 export async function search(query: string) {
   const q = query.trim();
   if (!q) { alert("검색어 또는 영상 주소를 입력해 주세요!"); return; }
+  // 2.8.1: 검색할 때마다 번호를 매겨, 늦게 도착한 이전 검색 결과가 방금 튼 영상을 멈추거나 새 결과를 덮지 않게
+  const my = ++searchSeq;
   const m = q.match(URL_RE);
   if (m && m[2].length === 11) { showPlayer(m[2]); return; }
   if (!getKey()) { toggleKeyPanel(true); setStatus("검색하려면 YouTube API 키가 필요합니다. 주소를 붙여넣으면 키 없이 바로 재생됩니다.", true); return; }
@@ -81,6 +84,7 @@ export async function search(query: string) {
   try {
     const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&safeSearch=strict&maxResults=12&regionCode=KR&relevanceLanguage=ko&q=${encodeURIComponent(q)}&key=${encodeURIComponent(getKey())}`;
     const j = await httpGetJson(url);
+    if (my !== searchSeq) return;
     const list: Result[] = (j.items ?? []).map((i: any) => ({
       id: i.id?.videoId, title: decodeEntities(i.snippet?.title ?? ""), channel: i.snippet?.channelTitle ?? "",
       thumb: i.snippet?.thumbnails?.medium?.url ?? `https://i.ytimg.com/vi/${i.id?.videoId}/mqdefault.jpg`,
@@ -90,6 +94,7 @@ export async function search(query: string) {
     renderResults(list);
     setStatus("");
   } catch (e: any) {
+    if (my !== searchSeq) return;
     const body = e?.body ? String(e.body) : "";
     let msg = e?.message || String(e);
     if (/quotaExceeded/.test(body)) msg = "오늘의 검색 할당량(약 100회)을 다 썼습니다. 내일 다시 검색할 수 있고, 주소 붙여넣기는 계속 됩니다.";

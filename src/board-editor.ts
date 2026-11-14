@@ -94,6 +94,7 @@ async function heicToJpeg(f: Blob): Promise<Blob> {
 const HEIC_MSG =
   "아이폰 사진(HEIC 형식)을 변환하지 못했습니다.\n" +
   "JPG로 바꿔서 넣어 주세요. (아이폰: 설정 → 카메라 → 포맷 → '높은 호환성'으로 찍으면 처음부터 JPG로 저장됩니다)";
+const SWITCHED_MSG = "사진을 준비하는 동안 판서·알림 화면이 바뀌어 넣지 않았습니다. 다시 넣어 주세요.";
 const BROKEN_MSG = "사진을 열 수 없습니다. 파일이 손상됐거나 지원하지 않는 형식입니다. (JPG·PNG·GIF·WEBP·HEIC 사진을 넣어 주세요)";
 
 /** blob → 다 읽힌 <img>. 실패하면 null */
@@ -141,6 +142,8 @@ class BoardEditor {
    *  있어, 그때 이 범위에 서식을 적용한다. 편집기 안을 클릭하거나 글자를 치면 지워진다. */
   private lastRange: { from: number; to: number } | null = null;
   private lastEditorInteraction = 0;
+  /** 내용을 통째로 바꿀 때마다 1씩 늘어남. 사진 처리(변환·저장)를 기다리는 동안 판서↔알림이 바뀌었는지 확인용 */
+  private docGen = 0;
 
   init(container: HTMLElement) {
     this.container = container;
@@ -175,6 +178,10 @@ class BoardEditor {
           return true;
         },
         handlePaste: (_view, event) => {
+          // 2.8.1: 엑셀·파워포인트 등은 표(HTML)·글자와 함께 '그림'도 클립보드에 넣음. 예전엔 그림이 있으면 무조건 그림으로 붙여서
+          // 엑셀 표를 복사해 붙이면 고칠 수 없는 사진이 됐음 → HTML 에 글자가 있으면 보통 붙여넣기(표·글자)로
+          const html = event.clipboardData?.getData("text/html") || "";
+          if (html && html.replace(/<img[^>]*>/gi, "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim()) return false;
           const items = Array.from(event.clipboardData?.items ?? []);
           const files = items.filter((i) => i.type.startsWith("image/")).map((i) => i.getAsFile()).filter((f): f is File => !!f);
           if (files.length === 0) return false;
@@ -240,16 +247,23 @@ class BoardEditor {
   }
 
   // ---------- 내용 ----------
-  getHTML() { return this.editor.isEmpty ? "" : this.editor.getHTML(); }
+  /** 빈 문단 하나뿐이면 "" (2.8.1: 예전엔 TipTap isEmpty 만 봐서 빈 표·빈 목록도 ""로 저장돼 사라졌음) */
+  getHTML() {
+    const doc = this.editor.state.doc;
+    const blank = this.editor.isEmpty && doc.childCount === 1 && doc.firstChild?.type.name === "paragraph";
+    return blank ? "" : this.editor.getHTML();
+  }
   /** 내용을 통째로 바꿈 (시작·판서↔알림 전환·기록 불러오기). 되돌리기 기록도 비움:
    *  남겨 두면 알림으로 바꾼 뒤 Ctrl+Z 한 번에 판서 내용이 돌아와 알림장으로 저장돼 버렸음 */
   setHTML(html: string) {
+    this.docGen++;
+    this.lastRange = null; // 2.8.1: 앞 내용에서 기억한 선택 범위가 새 내용의 엉뚱한 글자에 서식을 입히지 않게
     this.editor.commands.setContent(html || "", { emitUpdate: false });
     const { state, view } = this.editor;
     view.updateState(EditorState.create({ doc: state.doc, plugins: state.plugins, selection: state.selection }));
   }
-  clear() { this.editor.commands.clearContent(false); }
-  isEmpty() { return this.editor.isEmpty; }
+  clear() { this.docGen++; this.lastRange = null; this.editor.commands.clearContent(false); }
+  isEmpty() { return this.getHTML() === ""; }
   onUpdate(cb: UpdateListener) { this.listeners.push(cb); }
   focus() { this.editor.commands.focus(); }
   /** 스크롤을 움직이지 않고 포커스만 (판서/알림 전환 때 화면 위치 유지) */
@@ -314,6 +328,7 @@ class BoardEditor {
   async insertImageFile(file: File): Promise<void> {
     if (!isImageFile(file)) { alert("이미지 파일만 삽입할 수 있습니다."); return; }
     const done = busyNotice(isHeicName(file) ? "아이폰 사진을 변환하는 중…" : "사진을 넣는 중…");
+    const gen = this.docGen;
     try {
       let source: Blob = file;
       let img = isHeicName(file) ? null : await decodeImage(file);
@@ -350,6 +365,7 @@ class BoardEditor {
       const width = Math.max(40, Math.min(w, Math.round(editorW * 0.5)));
       const height = Math.round((width * h) / w);
       // 글자를 선택한 상태여도 그 글자를 지우지 않도록 선택 끝에 삽입
+      if (gen !== this.docGen) { alert(SWITCHED_MSG); return; } // 기다리는 동안 판서↔알림이 바뀜
       const at = Math.min(this.editor.state.selection.to, this.editor.state.doc.content.size);
       this.editor.chain().focus().setTextSelection(at)
         .insertContent({ type: "image", attrs: { src: stored.src, file: stored.file, alt: "판서 사진", width, height } })
@@ -361,12 +377,14 @@ class BoardEditor {
 
   /** 이미 다 만든 그림(QR 코드 등)을 다시 압축하지 않고 그대로 넣음. width 는 처음 보이는 너비(px) */
   async insertPreparedImage(blob: Blob, width: number, alt = "판서 사진"): Promise<void> {
+    const gen = this.docGen;
     const img = await decodeImage(blob);
     if (!img) { alert(BROKEN_MSG); return; }
     let stored;
     try { stored = await storeImage(blob); }
     catch (e) { console.error("사진 저장 실패:", e); alert("사진을 저장하지 못했습니다: " + e); return; }
     const height = Math.round((width * img.naturalHeight) / img.naturalWidth);
+    if (gen !== this.docGen) { alert(SWITCHED_MSG); return; }
     const at = Math.min(this.editor.state.selection.to, this.editor.state.doc.content.size);
     this.editor.chain().focus().setTextSelection(at)
       .insertContent({ type: "image", attrs: { src: stored.src, file: stored.file, alt, width, height } })

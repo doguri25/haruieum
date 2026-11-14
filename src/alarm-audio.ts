@@ -6,7 +6,7 @@
 // ============================================================
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { isTauri, storage } from "./storage";
+import { isTauri } from "./storage";
 
 const DEFAULT_ALARM_URL = "alarm.mp3"; // public/alarm.mp3
 const cache = new Map<string, string>(); // 파일 이름 → Blob URL
@@ -54,7 +54,7 @@ export async function pickAlarmMp3(): Promise<string | null> {
   if (!picked || typeof picked !== "string") return null;
   const name = await invoke<string>("import_alarm_mp3", { src: picked });
   cache.delete(name); // 같은 이름으로 다시 골랐을 수 있으니 새로 읽음
-  storage.setItem("smartBoardCustomMp3", name);
+  // (2.8.1: 고르기만 해서는 저장하지 않음 — 설정 창의 '저장'에서 저장. 예전엔 취소해도 다음 실행부터 바뀌었음)
   await preloadAlarm(name);
   return name;
 }

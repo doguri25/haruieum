@@ -133,9 +133,16 @@ function setPos(el: HTMLElement, opts: FloatingOptions, left: number, top?: numb
 }
 
 function bringToFront(el: HTMLElement) {
-  // 100~119 사이를 돌려 씀: 알람 팝업(z 120)보다는 항상 아래, 일반 창보다는 위
-  zCounter = zCounter >= 119 ? 100 : zCounter + 1;
-  el.style.zIndex = String(zCounter);
+  // 100~119 사이를 씀: 알람 팝업(z 120)보다는 항상 아래, 일반 창보다는 위
+  if (el.style.zIndex === String(zCounter)) return; // 이미 맨 위
+  if (zCounter >= 119) {
+    // 2.8.1: 예전엔 119 다음에 100으로 되돌아가서, 방금 누른 창이 오히려 다른 창 뒤로 갔음 → 지금 순서대로 100부터 다시 매김
+    const others = registry.map((r) => r.el).filter((e) => e !== el)
+      .sort((a, b) => (Number(a.style.zIndex) || 0) - (Number(b.style.zIndex) || 0));
+    zCounter = 99;
+    others.forEach((o) => { o.style.zIndex = String(++zCounter); });
+  }
+  el.style.zIndex = String(++zCounter);
 }
 
 /** 머리글 드래그 */
@@ -146,6 +153,8 @@ function attachDrag(el: HTMLElement, handle: HTMLElement, opts: FloatingOptions)
   let width = 0, height = 0;
 
   handle.addEventListener("pointerdown", (e) => {
+    // 2.8.1: 손가락으로 끌면 뒤따르는 click 이 없어 '방금 끌었음' 표시가 남아, 다음에 머리글의 닫기·저장 버튼을 누르면 무시됐음
+    moved = false;
     // 머리글 안의 버튼·입력칸을 누른 경우는 드래그가 아님
     if ((e.target as HTMLElement).closest("button, input, select, textarea, a, [contenteditable]")) return;
     if (e.button !== 0) return;
@@ -292,6 +301,14 @@ export function makeFloating(opts: FloatingOptions) {
   registry.push({ el, opts });
   applyState(el, opts);
 }
+
+/** 안의 내용이 커졌을 때(학습 약속 메뉴를 펼침 등) 화면 밖으로 나갔으면 안으로 (2.8.1) */
+export function refitFloating(id: string) {
+  const r = registry.find((x) => x.opts.id === id);
+  if (r) keepInside(r.el, r.opts);
+}
+declare global { interface Window { refitFloating: typeof refitFloating } }
+window.refitFloating = refitFloating;
 
 /** 앱의 떠 있는 팝업 전부 등록 */
 export function initFloatingPanels() {

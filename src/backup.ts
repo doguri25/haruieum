@@ -29,7 +29,7 @@ export async function importBackupFrom(src: string, reload = true): Promise<stri
   try {
     before = await invoke<string>("import_backup", { src, stamp: stamp() });
   } catch (e) {
-    storage.resume();
+    storage.resume(true); // 2.8.1: 파일을 바꾸다 실패했어도 메모리의 지금 내용으로 다시 써 둠
     throw e;
   }
   if (reload) window.setTimeout(() => location.reload(), 50);
