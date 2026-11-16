@@ -118,9 +118,12 @@ class AppStorage {
       this.onError?.(`${b} 저장 파일을 읽을 수 없습니다. 원본을 지키려고 이번 실행에서는 이 항목을 저장하지 않습니다. 앱을 다시 시작해 주세요.`);
       return null;
     }
-    // 내용이 깨졌고 백업도 없음 → 깨진 파일은 <이름>.corrupt.json 으로 남겨 두고 빈 상태로 시작
-    try { await invoke("snapshot_store_once", { name: b, tag: "corrupt" }); } catch { /* 남기지 못해도 계속 */ }
-    this.onError?.(`${b} 저장 파일이 손상되어 비워진 상태로 시작합니다. (원본은 ${b}.corrupt.json 으로 남겨 두었습니다)`);
+    // 내용이 깨졌고 백업도 없음 → 깨진 파일은 <이름>.corrupt-<시각>.json 으로 남겨 두고 빈 상태로 시작
+    // (2.8.2: 시각을 붙여 깨질 때마다 따로 남김 — 예전엔 처음 한 번만 남아 두 번째 원본은 사라졌음)
+    const d = new Date(), p2 = (n: number) => String(n).padStart(2, "0");
+    const tag = `corrupt-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
+    try { await invoke("snapshot_store_once", { name: b, tag }); } catch { /* 남기지 못해도 계속 */ }
+    this.onError?.(`${b} 저장 파일이 손상되어 비워진 상태로 시작합니다. (원본은 ${b}.${tag}.json 으로 남겨 두었습니다)`);
     return null;
   }
 
@@ -188,6 +191,8 @@ class AppStorage {
   }
 
   hasUnsaved() { return this.dirty.size > 0 || this.saving.size > 0; }
+  /** 시작할 때 읽지 못한·깨진 저장소가 있었거나 복원 중 → 이때는 '안 쓰는 사진 정리'를 하지 않음 (2.8.2) */
+  get unsafeForCleanup() { return this.loadProblem || this.blocked.size > 0 || this.suspended; }
 
   /** 파일 저장을 멈춤 (복원 직전). 이후 화면을 다시 읽을 때까지 아무것도 쓰지 않음 */
   suspend() {

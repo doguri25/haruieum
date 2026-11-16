@@ -95,7 +95,9 @@ export async function loadMonth(y: number, m0: number, force = false): Promise<M
 }
 
 /** 시작할 때·날짜가 바뀔 때·학교를 바꿀 때: 이번 달 일정 + 오늘 하루를 확인 */
+let retryTimer = 0;
 export async function refreshToday(force = false) {
+  window.clearTimeout(retryTimer);
   const school = getSchool();
   if (!school) return;
   const now = new Date();
@@ -109,7 +111,9 @@ export async function refreshToday(force = false) {
       if (c.months[key]) { c.months[key].events = tidy([...c.months[key].events, ...today]); saveCache(c); }
     }
   } catch (e) {
-    console.warn("학사일정을 받지 못했습니다(저장된 일정으로 판단):", e);
+    console.warn("학사일정을 받지 못했습니다(저장된 일정으로 판단, 5분 뒤 다시 시도):", e);
+    // 2.8.2: 예전엔 실패하면 그날 다시 받지 않아, 아침에 인터넷이 늦게 연결되면 휴업일에도 종이 울렸음
+    retryTimer = window.setTimeout(() => { void refreshToday(force).then(() => (window as any).renderTimetable?.()); }, 5 * 60_000);
   }
 }
 

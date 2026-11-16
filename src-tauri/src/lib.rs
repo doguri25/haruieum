@@ -44,8 +44,10 @@ fn check_store_name(name: &str) -> Result<(), String> {
 
 /// 파일 이름은 폴더 구분자·상위 이동·드라이브 지정(C:이름) 금지.
 /// 2.8.1: ':' 도 막음 — 윈도우에서 "C:이름" 은 join 하면 앞 경로를 버리고 C 드라이브의 현재 폴더를 가리킴
+/// 2.8.2: '..' 이 들어간 이름('띵동... 수업.mp3')은 막지 않음 — 파일 이름 한 칸은 폴더를 넘어갈 수 없고,
+/// 예전엔 이런 소리 파일을 가져와 놓고도 재생·백업이 안 됐음. 점으로만 된 이름('.', '..')은 막음
 fn check_file_name(name: &str) -> Result<(), String> {
-    if name.is_empty() || name.contains('/') || name.contains('\\') || name.contains("..") || name.contains(':') {
+    if name.trim_matches('.').is_empty() || name.contains('/') || name.contains('\\') || name.contains(':') {
         return Err(format!("잘못된 파일 이름: {name}"));
     }
     Ok(())
@@ -57,6 +59,11 @@ fn read_text_or_empty(path: &std::path::Path) -> Result<String, String> {
     match std::fs::read_to_string(path) {
         Ok(s) => Ok(s),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
+        // 2.8.2: 글자가 깨진 파일은 잠김·권한 같은 '읽기 오류'가 아니라 '내용 깨짐' → 그대로 돌려줘서 JS 가 깨진 내용으로 처리
+        // (예전엔 읽기 오류로 보고 그 저장소의 저장을 영영 막았음)
+        Err(e) if e.kind() == std::io::ErrorKind::InvalidData => std::fs::read(path)
+            .map(|b| String::from_utf8_lossy(&b).into_owned())
+            .map_err(|e| format!("{}: {e}", path.display())),
         Err(e) => Err(format!("{}: {e}", path.display())),
     }
 }
@@ -111,9 +118,28 @@ fn import_alarm_mp3(app: tauri::AppHandle, src: String) -> Result<String, String
         .ok_or_else(|| "파일 이름을 알 수 없습니다".to_string())?
         .to_string_lossy()
         .to_string();
-    let dest = dir.join(&file_name);
+    check_file_name(&file_name)?;
+    // 2.8.2: 같은 이름의 다른 소리가 이미 있으면 덮어쓰지 않고 '이름 (2).mp3' 처럼 새 이름으로
+    // (예전엔 고르기만 하고 '저장'하지 않아도 저장된 소리가 바뀌어 버렸음)
+    let mut name = file_name.clone();
+    let mut dest = dir.join(&name);
+    if dest.exists() {
+        let same = std::fs::read(&dest).ok() == std::fs::read(src_path).ok();
+        if !same {
+            let p = std::path::Path::new(&file_name);
+            let stem = p.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+            let ext = p.extension().map(|e| format!(".{}", e.to_string_lossy())).unwrap_or_default();
+            let mut n = 2;
+            loop {
+                name = format!("{stem} ({n}){ext}");
+                dest = dir.join(&name);
+                if !dest.exists() { break; }
+                n += 1;
+            }
+        }
+    }
     std::fs::copy(src_path, &dest).map_err(|e| e.to_string())?;
-    Ok(file_name)
+    Ok(name)
 }
 
 /// data/alarm/<name> 의 바이트를 그대로 돌려줌 (JS 에서 Blob 으로 재생)
@@ -324,7 +350,8 @@ fn write_backup_zip(app: &tauri::AppHandle, dest: &std::path::Path, stamp: &str)
 }
 
 /// 지금 데이터를 dest(.zip) 로 백업. 담은 파일 수를 돌려줌 (JS 가 먼저 저장을 마친 뒤 호출)
-#[tauri::command]
+// 2.8.2: async — 사진이 많으면 오래 걸리는데, 예전엔 화면 스레드에서 돌아 그동안 앱이 '응답 없음'이 됐음
+#[tauri::command(async)]
 fn export_backup(app: tauri::AppHandle, dest: String, stamp: String) -> Result<u32, String> {
     check_stamp(&stamp)?;
     write_backup_zip(&app, std::path::Path::new(&dest), &stamp)
@@ -333,7 +360,7 @@ fn export_backup(app: tauri::AppHandle, dest: String, stamp: String) -> Result<u
 /// src(.zip) 로 복원. 먼저 지금 데이터를 <앱 데이터>/backups/before-restore-<시각>.zip 으로 남긴 뒤,
 /// 저장 파일(json)을 백업의 것으로 바꾸고 사진·소리를 추가함. 끝나면 JS 가 화면을 다시 읽음.
 /// 돌려주는 값: 자동으로 남긴 '복원 전' 백업 파일 경로
-#[tauri::command]
+#[tauri::command(async)]
 fn import_backup(app: tauri::AppHandle, src: String, stamp: String) -> Result<String, String> {
     check_stamp(&stamp)?;
     let file = std::fs::File::open(&src).map_err(|e| format!("백업 파일을 열 수 없습니다: {e}"))?;
@@ -555,6 +582,15 @@ pub fn run() {
                 let _ = w.set_focus();
             }
         }))
+        // 2.8.2: 메인 창이 없어지면 앱을 끝냄. 예전엔 팅커벨·아이스크림·유튜브 창이 열려 있으면 창 없는 앱이 계속 남아
+        // 종·알람도 안 울리고, 두 번 실행 방지 때문에 다시 켤 수도 없었음
+        .on_window_event(|window, event| {
+            if window.label() == "main" {
+                if let tauri::WindowEvent::Destroyed = event {
+                    window.app_handle().exit(0);
+                }
+            }
+        })
         // 6단계: 1초마다 "sb-tick" 이벤트를 보냄.
         // 웹뷰의 setInterval 은 창이 가려지거나 최소화되면 브라우저가 느리게 돌려서
         // 타이머·알람이 늦거나 빠지므로, 시계는 Rust 스레드가 대신 쳐 줍니다.

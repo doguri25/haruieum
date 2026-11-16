@@ -181,7 +181,10 @@ class BoardEditor {
           // 2.8.1: 엑셀·파워포인트 등은 표(HTML)·글자와 함께 '그림'도 클립보드에 넣음. 예전엔 그림이 있으면 무조건 그림으로 붙여서
           // 엑셀 표를 복사해 붙이면 고칠 수 없는 사진이 됐음 → HTML 에 글자가 있으면 보통 붙여넣기(표·글자)로
           const html = event.clipboardData?.getData("text/html") || "";
-          if (html && html.replace(/<img[^>]*>/gi, "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim()) return false;
+          // 2.8.2: 본문(body)의 글자만 셈 — 워드는 <head> 에 문서 설정(XML)이 들어 있어, 예전 방식은 그림만 복사해도 '글자 있음'으로 보고
+          // 열 수 없는 file:/// 그림을 넣었음
+          const bodyText = html ? (new DOMParser().parseFromString(html, "text/html").body?.textContent || "").replace(/\u00a0/g, " ").trim() : "";
+          if (bodyText) return false;
           const items = Array.from(event.clipboardData?.items ?? []);
           const files = items.filter((i) => i.type.startsWith("image/")).map((i) => i.getAsFile()).filter((f): f is File => !!f);
           if (files.length === 0) return false;

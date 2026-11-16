@@ -158,6 +158,7 @@ async function renderMenu() {
   window.lucide?.createIcons();
 }
 
+let loadSeq = 0;
 /** 지금 보는 날짜(또는 주)의 식단을 받아 그림 */
 async function load() {
   const c = el("modal-lunch-content"); const school = getSchool();
@@ -167,23 +168,24 @@ async function load() {
   shown = null;
   window.lucide?.createIcons();
   const base = { ATPT_OFCDC_SC_CODE: school.officeCode, SD_SCHUL_CODE: school.code };
-  const want = `${weekMode}-${ymd(viewDate)}`;
+  // 2.8.2: 받기마다 순번 — 날짜뿐 아니라 학교를 바꾼 경우에도 늦게 온 이전 응답을 버림
+  const seq = ++loadSeq;
   try {
     if (weekMode) {
       const mon = mondayOf(viewDate);
       // 인증키 없이 5건까지라 중식(코드 2)만 받음 → 월~금 5건
       const rows = await neisRows("mealServiceDietInfo", { ...base, MLSV_FROM_YMD: ymd(mon), MLSV_TO_YMD: ymd(addDays(mon, 4)), MMEAL_SC_CODE: "2" });
-      if (want !== `${weekMode}-${ymd(viewDate)}`) return; // 그 사이 다른 날짜로 이동함
+      if (seq !== loadSeq) return; // 그 사이 다른 날짜·학교로 바뀜
       const byDay = new Map(rows.map((r: any) => [String(r.MLSV_YMD), rowToMeal(r)]));
       shown = { week: [0, 1, 2, 3, 4].map((i) => byDay.get(ymd(addDays(mon, i))) ?? null) };
     } else {
       const rows = await neisRows("mealServiceDietInfo", { ...base, MLSV_YMD: ymd(viewDate) });
-      if (want !== `${weekMode}-${ymd(viewDate)}`) return;
+      if (seq !== loadSeq) return;
       shown = { day: rows.length ? rowToMeal(pickLunch(rows)) : null };
     }
     await renderMenu();
   } catch (e) {
-    if (want !== `${weekMode}-${ymd(viewDate)}`) return; // 그 사이 다른 날짜로 이동함
+    if (seq !== loadSeq) return; // 그 사이 다른 날짜·학교로 바뀜
     console.error("급식 오류:", e);
     c.innerHTML = `<h3 class="text-2xl font-bold text-emerald-800 mb-3">${esc(school.name)}</h3>${navHtml()}<div class="text-center text-red-500 py-10 font-bold text-xl bg-red-50 rounded-2xl">급식 정보를 가져오는데 실패했습니다.<div class="text-sm text-red-400 mt-2 break-all">${esc(String((e as Error)?.message || e))}</div></div>`;
     window.lucide?.createIcons();

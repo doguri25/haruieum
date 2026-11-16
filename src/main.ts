@@ -100,7 +100,8 @@ async function installCloseFlush() {
   const win = getCurrentWindow();
   let closing = false;
   await win.onCloseRequested(async (event) => {
-    if (closing) return;
+    // 2.8.2: 저장하는 동안 X 를 또 누르면 기다리지 않고 바로 닫혀 저장이 끊길 수 있었음 → 두 번째 누름은 무시
+    if (closing) { event.preventDefault(); return; }
     event.preventDefault();
     closing = true;
     // 저장이 끝나면 창을 실제로 없앰. (destroy 는 core:window:allow-destroy 권한이 필요 —

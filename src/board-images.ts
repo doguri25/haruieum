@@ -128,7 +128,8 @@ export async function migrateStoredImages(): Promise<number> {
 
 /** 어떤 저장 내용에도 없는 사진 파일 중 오래된 것을 지움 */
 export async function cleanupUnusedImages(): Promise<number> {
-  if (!isTauri()) return 0;
+  // 2.8.2: 읽지 못한 저장소가 있으면 그 안의 사진을 '안 쓰는 사진'으로 잘못 보고 지웠음 → 그런 날은 정리하지 않음
+  if (!isTauri() || storage.unsafeForCleanup) return 0;
   const keep = new Set<string>();
   for (let i = 0; i < storage.length; i++) {
     const v = storage.getItem(storage.key(i) ?? "");

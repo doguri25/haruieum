@@ -88,6 +88,9 @@ export function startLegacyApp() {
         let lastCheckedMinuteStr = null; 
         let lastTickTime = null;   // 마지막으로 시계를 돌린 시각 (놓친 분 확인용)
         let lastClockDay = null;   // 날짜가 바뀌었는지 확인용 (켜 둔 채 밤을 넘기는 경우)
+        // 2.8.2: 시작할 때 시계(initClock)가 바로 쓰므로 여기서 선언 (아래쪽에 두면 선언 전에 읽혀 시작이 중간에 멈춤)
+        let ttsPending = false;       // 안내 음성이 곧 나올 예정(0.3초 대기 중) — 이때도 '말하는 중'으로 봄
+        let timerEndPending = false;  // 종소리·안내 중에 끝난 타이머 → 소리가 끝나면 알림
         let timerEndAt = 0;        // 타이머 종료 시각(ms). 남은 시간은 매 tick 마다 여기서 계산
         let lastAlarmKey = null;
         let audioUnlocked = false;
@@ -331,6 +334,8 @@ export function startLegacyApp() {
         }
 
         function triggerNoiseWarning() {
+            // 2.8.2: 종소리·안내 중이거나 알람 창이 떠 있으면 경고하지 않음 (예전엔 경고 음성이 종 안내를 끊었고, 종소리를 소음으로 세었음)
+            if (soundBusy() || document.getElementById('modal-alarm')?.classList.contains('active')) { noiseConsecutiveRedCount = 0; return; }
             noiseWarningCooldown = true;
             noiseWarningCount++;
             document.getElementById('noise-warning-count').innerText = noiseWarningCount;
@@ -470,15 +475,19 @@ export function startLegacyApp() {
             if(!ed) return;
             if(val === 'inherit') {
                 ed.style.backgroundColor = 'transparent';
+                ed.style.color = ''; // 테마 글씨색
                 ed.classList.remove('text-slate-50');
                 ed.classList.add('text-slate-800');
             } else {
                 ed.style.backgroundColor = val;
                 // 어두운 칠판 계열을 선택하면 기본 글씨색을 하얀색으로 변경하여 분필 느낌 연출
                 if (val === '#064e3b' || val === '#1e293b') {
+                    ed.style.color = '';
                     ed.classList.remove('text-slate-800');
                     ed.classList.add('text-slate-50');
                 } else {
+                    // 2.8.2: 화이트보드·옐로우보드는 테마와 상관없이 어두운 글씨 (어두운 테마에선 글씨가 흰색이라 보이지 않았음)
+                    ed.style.color = '#1e293b';
                     ed.classList.remove('text-slate-50');
                     ed.classList.add('text-slate-800');
                 }
@@ -574,7 +583,8 @@ export function startLegacyApp() {
             storage.setItem('smartBoardAlarmPopupEnabled', isAlarmPopupEnabled); 
             storage.setItem('smartBoardStartOffset', startAlarmOffset); 
             storage.setItem('smartBoardEndOffset', endAlarmOffset); 
-            storage.setItem('smartBoardAlarmMelody', alarmMelody); 
+            storage.setItem('smartBoardAlarmMelody', alarmMelody);
+            storage.setItem('smartBoardAlarmDuration', alarmDurationSec); // 2.8.2: 예전엔 저장하지 않아 다시 켜면 60초로 돌아갔음 
             storage.setItem('smartBoardCustomMp3', customMp3FileName); 
             storage.setItem('smartBoardStartMsg', startAlarmMessage); 
             storage.setItem('smartBoardEndMsg', endAlarmMessage); 
@@ -590,6 +600,7 @@ export function startLegacyApp() {
         function executeReset() { 
             if(document.getElementById('reset-board').checked) { 
                 storage.removeItem('smartBoardCurrentNotepad'); 
+                storage.removeItem('smartBoardCurrentNotice'); // 2.8.2: 알림장도 (예전엔 남아 있다가 다시 나타났음)
                 storage.removeItem('smartBoardSavedData'); 
                 storage.removeItem('smartBoardNotepadBg');
                 storage.removeItem('smartBoardNotepadBg_board');
@@ -610,7 +621,10 @@ export function startLegacyApp() {
             if(document.getElementById('reset-alarm').checked) { 
                 ['smartBoardStartOffset','smartBoardEndOffset','smartBoardStartMsg','smartBoardEndMsg','smartBoardClosingMsg','smartBoardAlarmMelody','smartBoardCustomAlarmEnabled','smartBoardMutedPeriods','smartBoardVolume', 'smartBoardAlarmPopupEnabled', 'smartBoardLeaveWorkEnabled', 'smartBoardLeaveWorkTime', 'smartBoardLeaveWorkPopupEnabled', 'smartBoardLeaveWorkPopupDuration'].forEach(k=>storage.removeItem(k)); 
             } 
-            if(document.getElementById('reset-all').checked) { 
+ 
+            // 2.8.2: 명렬표·학교 등 목록에 없는 항목은 네 항목을 모두 체크했을 때만 (예전엔 '전체선택' 뒤 하나를 풀어도 지워졌음)
+            const allChecked = ['reset-board', 'reset-note', 'reset-table', 'reset-alarm'].every(id => document.getElementById(id).checked);
+            if(document.getElementById('reset-all').checked && allChecked) { 
                 storage.removeItem('smartBoardSchool'); 
                 storage.removeItem('smartBoardStudentNames'); 
                 storage.removeItem('smartBoardTimerVisible');
@@ -789,8 +803,33 @@ export function startLegacyApp() {
         }
 
         function openSavedBoards() { renderSavedBoards(); const t = document.getElementById('toggle-notice-autoarchive'); if (t) t.checked = isNoticeAutoArchiveOn(); document.getElementById('modal-saved-list').classList.add('active'); }
-        function renderSavedBoards() { const c = document.getElementById('saved-boards-container'); c.innerHTML = ''; if(savedBoards.length === 0) { c.innerHTML = '<div class="text-center text-slate-500 py-10 font-bold bg-white rounded-xl">저장된 기록이 없습니다.</div>'; return; } savedBoards.forEach(b => { const el = document.createElement('div'); el.className = 'flex items-center justify-between p-5 bg-white border border-slate-200 rounded-2xl hover:border-indigo-300 hover:shadow-md transition cursor-pointer group'; el.innerHTML = `<div class="flex-1 overflow-hidden" onclick="viewSavedBoard(${b.id})"><h4 class="font-bold text-slate-800 text-xl flex items-center mb-1 truncate"><i data-lucide="file-text" class="w-6 h-6 mr-2 text-indigo-500 shrink-0"></i>${escHtml(b.title)}</h4><span class="text-base text-slate-500 font-bold ml-8">${escHtml(b.date)}</span></div><button onclick="deleteSavedBoard(${b.id}, event)" class="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition" title="삭제"><i data-lucide="trash-2" class="w-6 h-6"></i></button>`; c.appendChild(el); }); refreshIcons(); }
-        function viewSavedBoard(id) { const b = savedBoards.find(x => x.id === id); if(!b) return; viewingBoardId = id; document.getElementById('viewer-date').innerText = b.date; const vc = document.getElementById('viewer-content'); vc.innerHTML = b.content; if (window.boardImages) window.boardImages.resolveImagesIn(vc); document.getElementById('modal-board-viewer').classList.add('active'); }
+        // 2.8.2: 백업 복원으로 다른 사람이 만든 기록이 들어올 수 있으므로 (1) 목록의 id 를 HTML 안에 넣지 않고
+        // (2) 기록 보기는 위험한 태그·on* 속성·javascript: 주소를 지운 뒤 보여 줌. 예전엔 조작된 기록을 열면 스크립트가 실행될 수 있었음
+        function renderSavedBoards() {
+            const c = document.getElementById('saved-boards-container'); c.innerHTML = '';
+            if(savedBoards.length === 0) { c.innerHTML = '<div class="text-center text-slate-500 py-10 font-bold bg-white rounded-xl">저장된 기록이 없습니다.</div>'; return; }
+            savedBoards.forEach(b => {
+                const el = document.createElement('div');
+                el.className = 'flex items-center justify-between p-5 bg-white border border-slate-200 rounded-2xl hover:border-indigo-300 hover:shadow-md transition cursor-pointer group';
+                el.innerHTML = `<div class="flex-1 overflow-hidden"><h4 class="font-bold text-slate-800 text-xl flex items-center mb-1 truncate"><i data-lucide="file-text" class="w-6 h-6 mr-2 text-indigo-500 shrink-0"></i>${escHtml(b.title)}</h4><span class="text-base text-slate-500 font-bold ml-8">${escHtml(b.date)}</span></div><button class="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition" title="삭제"><i data-lucide="trash-2" class="w-6 h-6"></i></button>`;
+                el.firstElementChild.addEventListener('click', () => viewSavedBoard(b.id));
+                el.querySelector('button').addEventListener('click', (ev) => deleteSavedBoard(b.id, ev));
+                c.appendChild(el);
+            });
+            refreshIcons();
+        }
+        function sanitizeHtml(html) {
+            const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+            doc.body.querySelectorAll('script,iframe,object,embed,base,link,meta,style,form,frame,frameset,svg,math,template').forEach(n => n.remove());
+            doc.body.querySelectorAll('*').forEach(n => {
+                for (const at of [...n.attributes]) {
+                    const name = at.name.toLowerCase(), val = at.value.replace(/[\s\u0000-\u001f]+/g, '').toLowerCase();
+                    if (name.startsWith('on') || ((name === 'href' || name === 'src' || name === 'xlink:href' || name === 'action' || name === 'formaction') && (val.startsWith('javascript:') || val.startsWith('vbscript:')))) n.removeAttribute(at.name);
+                }
+            });
+            return doc.body.innerHTML;
+        }
+        function viewSavedBoard(id) { const b = savedBoards.find(x => x.id === id); if(!b) return; viewingBoardId = id; document.getElementById('viewer-date').innerText = b.date; const vc = document.getElementById('viewer-content'); vc.innerHTML = sanitizeHtml(b.content); if (window.boardImages) window.boardImages.resolveImagesIn(vc); document.getElementById('modal-board-viewer').classList.add('active'); }
         // ---------- 2.7.0: 보관한 기록 다시 불러와 고치기 ----------
         // [판서] 기록은 판서로, [알림] 기록은 알림으로, 그 밖(팝업노트 등)은 지금 화면으로 불러옴.
         // 지금 내용이 있으면 확인을 받고, 덮어쓰기 전에 지금 내용을 목록에 자동 보관함 (잃어버리지 않게)
@@ -934,14 +973,18 @@ export function startLegacyApp() {
 
                                         
         // ⭐️ 가장 안전하고 단순한 방식의 TTS 출력
+        /** 종소리·안내 음성이 나오는 중인지 (타이머·소음 경고가 이걸 끊지 않게) */
+        function soundBusy() { return isAudioPlaying || ttsPending || !!(window.speechSynthesis && window.speechSynthesis.speaking); }
         function playTTS(text) { 
             if(!window.speechSynthesis || globalVolume === 0 || !text) return; 
             
             // 기존에 말하고 있던 것이 있다면 즉시 중단
             window.speechSynthesis.cancel(); 
+            ttsPending = true;
             
             // 너무 빨리 호출하면 브라우저 엔진이 꼬이는 현상을 막기 위해 약간의 지연 시간을 줌
             setTimeout(() => {
+                ttsPending = false;
                 const utterance = new SpeechSynthesisUtterance(text); 
                 utterance.lang = 'ko-KR'; 
                 utterance.volume = Math.min(1.0, globalVolume * 2.0); 
@@ -1158,6 +1201,8 @@ export function startLegacyApp() {
             leaveWorkPopupDuration = document.getElementById('select-leave-work-duration').value; 
             storage.setItem('smartBoardLeaveWorkPopupDuration', leaveWorkPopupDuration); 
             
+            // 2.8.2: 기본 시간표·시간이 실제로 바뀐 경우에만 '오늘만 바꾼 과목'을 지움 (예전엔 다른 설정만 저장해도 지워졌음)
+            const timetableBefore = JSON.stringify([schedule, timeSlots]);
             for(let di=1; di<=5; di++){ 
                 if(!schedule[di]) schedule[di] = [];
                 timeSlots.forEach((_, ri) => {
@@ -1165,10 +1210,8 @@ export function startLegacyApp() {
                     if(el) schedule[di][ri] = el.value;
                 }); 
             } 
+ 
             storage.setItem('smartBoardSchedule', JSON.stringify(schedule)); 
-
-            dailyOverride = { date: new Date().toLocaleDateString(), overrides: {} };
-            storage.removeItem('smartBoardDailyOverride');
 
             timeSlots.forEach((slot, i) => { 
                 const sEl = document.getElementById(`time-start-${i}`);
@@ -1177,6 +1220,10 @@ export function startLegacyApp() {
                 if(eEl) slot.end = eEl.value; 
             }); 
             storage.setItem('smartBoardTimeSlots', JSON.stringify(timeSlots)); 
+            if (JSON.stringify([schedule, timeSlots]) !== timetableBefore) {
+                dailyOverride = { date: new Date().toLocaleDateString(), overrides: {} };
+                storage.removeItem('smartBoardDailyOverride');
+            }
 
             if (window.updater) window.updater.saveSettings();
             closeModal('modal-settings'); 
@@ -1267,7 +1314,9 @@ export function startLegacyApp() {
         }
 
         function renderStudentGrid() { const c = document.getElementById('student-list-container'); c.innerHTML = studentNames.map((n, i) => `<div class="flex items-center bg-white border rounded-lg overflow-hidden"><div class="bg-slate-100 px-2 py-1 font-bold w-10 text-center border-r text-sm">${i+1}</div><input type="text" id="student-name-${i}" value="${escHtml(n)}" class="w-full px-2 py-1 outline-none text-base font-bold" onpaste="handleStudentPaste(event, ${i})"></div>`).join(''); }
-        function handleStudentPaste(e, idx) { e.preventDefault(); const names = e.clipboardData.getData('text').split(/[\r\n\t]+/).filter(n => n.trim()); names.forEach((n, i) => { if(idx+i < 35) document.getElementById(`student-name-${idx+i}`).value = n.trim(); }); }
+        // 2.8.2: 엑셀에서 붙여넣을 때 빈 칸(전학 간 번호)을 건너뛰지 않음 — 예전엔 뒤 학생 이름이 한 칸씩 당겨졌음.
+        // 번호·이름처럼 여러 칸을 복사하면 각 줄의 마지막 칸(이름)을 씀
+        function handleStudentPaste(e, idx) { e.preventDefault(); const rows = e.clipboardData.getData('text').replace(/\r\n?/g, '\n').replace(/\n+$/, '').split('\n'); rows.forEach((r, i) => { if (idx + i < 35) { const el = document.getElementById(`student-name-${idx + i}`); if (el) el.value = r.split('\t').pop().trim(); } }); }
         function clearStudentNames() { if(confirm('입력된 학생 명렬표를 초기화하시겠습니까?')) { studentNames = Array(35).fill(''); storage.setItem('smartBoardStudentNames', JSON.stringify(studentNames)); renderStudentGrid(); } }
 
         // 시간을 더하면 진행 막대의 전체 시간도 같이 늘어남 (시작 전이면 남은 시간이 곧 전체 시간)
@@ -1290,14 +1339,19 @@ export function startLegacyApp() {
             }
         }
         /** 매초 tick 에서 호출: 남은 시간 갱신, 0이 되면 종료 알림 */
+        // 2.8.2: 종소리·안내 음성이 나오는 중에 타이머가 끝나면, 예전엔 종을 끊고 알람 창 내용을 덮어써서
+        // 학생들이 다음 과목 안내를 못 들었음 → 소리가 끝난 뒤 알림
+        // (알람 창이 앞 소리를 멈추므로 창을 먼저 띄우고 '띵' 소리를 냄)
+        function fireTimerEnd() { showAlarm("타이머 종료", "시간이 다 되었습니다!", false, "타이머가 종료되었습니다.", true); playAttentionBell(); }
         function tickTimer() {
+            if (timerEndPending && !soundBusy()) { timerEndPending = false; fireTimerEnd(); }
             if (!isTimerRunning) return;
             timerRemaining = Math.max(0, Math.ceil((timerEndAt - Date.now()) / 1000));
             updateTimerDisplay();
             checkTimerWarnings();
             if (timerRemaining <= 0) {
-                resetTimer(); playAttentionBell();
-                showAlarm("타이머 종료", "시간이 다 되었습니다!", false, "타이머가 종료되었습니다.", true);
+                resetTimer();
+                if (soundBusy()) timerEndPending = true; else fireTimerEnd();
             }
         }
         function resetTimer() { isTimerRunning = false; timerEndAt = 0; timerRemaining = 0; timerTotal = 0; timerWarned = {}; updateTimerDisplay(); const btn = document.getElementById('btn-timer-toggle'); btn.innerText = '시작'; btn.classList.replace('bg-yellow-500', 'bg-blue-600'); btn.classList.replace('hover:bg-yellow-600', 'hover:bg-blue-700'); }
@@ -1502,7 +1556,10 @@ function showAlarm(t, m, isLeave=false, tts=null, skipMelody=false) {
     const modal = document.getElementById('modal-alarm'); if(!modal) return;
     document.getElementById('alarm-title').innerText = t; document.getElementById('alarm-message').innerText = m; modal.classList.add('active');
     if (window.smartboardHost && window.smartboardHost.bringToFront) window.smartboardHost.bringToFront(); // 다른 창 밑에 있어도 보이게
+ 
     let musicDuration = 0;
+    // 2.8.2: 앞 알람의 멜로디·뒤늦은 안내가 남아 새 알람 중에 엉뚱한 안내를 하지 않게 (멜로디 알람은 playAlarmMelody 가 이미 멈춤)
+    if (isLeave || skipMelody) stopAudio();
     if(isLeave) { playTTS(tts || "선생님, 퇴근 시간입니다. 수고하셨습니다."); } 
     else if(skipMelody) { playTTS(tts || m); musicDuration = 8; } 
     else { musicDuration = playAlarmMelody(alarmMelody, tts || m); }
