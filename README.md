@@ -202,6 +202,7 @@
   - **오로라 테마**(새 기본): 해 뜨는 언덕 배경(앱에 내장된 SVG), 유리 판, 우분투 주황(#E95420)·가지색. 글꼴 Ubuntu(숫자·영문, `@fontsource/ubuntu`) + 나눔고딕
   - 3.0 으로 처음 켤 때 한 번(`sb.v3.aurora`): 오로라 테마·우분투 주황·Dock 아래로 바꾸고 바탕색·판 색 지정은 테마 기본으로 (다시 고를 수 있음). 시간표·판서·기록은 그대로
   - 기능 코드에 추가: `getBoardMode/setBoardMode`, `isBellEnabled/setBellEnabled`, 도구 위치는 `.sb-dock-top`
+  - **자동 업데이트 서명키를 새로 만듦** (3.0.0 부터, `tauri.conf.json` 의 pubkey 교체). 2.x 와 키가 달라 2.x → 3.0 은 설치 파일로 한 번 직접 설치. 새 비공개키는 haruieum 저장소 시크릿 `TAURI_SIGNING_PRIVATE_KEY` 와 선생님 PC 에만 보관
   - 검사: 기존 브라우저 회귀 검사 전부 + 새 화면 49개 + 위젯 9개(NEIS 가짜 응답) + 실제 앱(tauri-driver)
 
 ## 개발 PC 준비 (macOS, 한 번만)
