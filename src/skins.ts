@@ -6,7 +6,7 @@ import { storage } from "./storage";
 export interface Skin { id: string; name: string; desc: string; brand: string; preview: { page: string; surface: string; accent: string; text: string } }
 
 export const SKINS: Skin[] = [
-  { id: "aurora", name: "오로라",     desc: "유리 판과 해 뜨는 언덕 (3.0 기본)", brand: "ubuntu", preview: { page: "#f7e6dc", surface: "#ffffff", accent: "#e95420", text: "#2a1027" } },
+  { id: "aurora", name: "오로라",     desc: "유리 판과 해 뜨는 언덕 (3.0 기본)", brand: "noeul", preview: { page: "#f9eae1", surface: "#ffffff", accent: "#ef6b3f", text: "#2a1027" } },
   { id: "light",  name: "밝은 기본",  desc: "깔끔한 흰 바탕",        brand: "default", preview: { page: "#f1f5f9", surface: "#ffffff", accent: "#6366f1", text: "#1e293b" } },
   { id: "dark",   name: "다크",       desc: "어두운 교실·저녁 수업",   brand: "default", preview: { page: "#0f172a", surface: "#1e293b", accent: "#818cf8", text: "#f1f5f9" } },
   { id: "chalk",  name: "칠판",       desc: "녹색 칠판과 크림색 판",   brand: "green",   preview: { page: "#173a2e", surface: "#fbf7ec", accent: "#10b981", text: "#2a2823" } },
@@ -56,13 +56,15 @@ export function renderSkinCards() {
     </button>`).join("");
 }
 
-/** 3.0.0 으로 처음 실행할 때 한 번: 새 디자인(오로라 테마 + 우분투 주황 + 아래쪽 Dock)으로 바꿈.
+/** 3.0.0 으로 처음 실행할 때 한 번: 새 디자인(오로라 테마 + 노을 주황 + 아래쪽 Dock)으로 바꿈.
  *  예전에 고른 바탕색·판 색은 유리 판과 어울리지 않아 테마 기본값으로 되돌림 (환경 설정에서 다시 고를 수 있음)
  *  기능 코드가 이 값들을 읽기 전에 불러야 함 */
 export function migrateToV3() {
+  // 3.0.1: 강조색 이름 'ubuntu' → 'noeul'(노을 주황). 3.0.0 을 쓰던 사람도 바꿔 둠
+  if (storage.getItem("smartBoardTheme") === "ubuntu") storage.setItem("smartBoardTheme", "noeul");
   if (storage.getItem("sb.v3.aurora")) return;
   storage.setItem(KEY, "aurora");
-  storage.setItem("smartBoardTheme", "ubuntu");
+  storage.setItem("smartBoardTheme", "noeul");
   storage.setItem("smartBoardBgColor", "skin");
   storage.setItem("smartBoardPanelColor", "skin");
   storage.setItem("smartBoardToolPos", "bottom");

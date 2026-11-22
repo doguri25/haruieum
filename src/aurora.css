@@ -1,6 +1,7 @@
 /* ============================================================
    3.0.0 하루이음 Aurora — 새 화면 뼈대의 모양 (뼈대: index.html, 동작: src/shell.ts)
-   macOS 의 유리 판·Dock·위젯 + Ubuntu 의 상단 바·활동 개요·빠른 설정
+   유리처럼 비치는 판 · 아래쪽 Dock · 위쪽 상태 바 · 모든 도구 모아 보기 · 빠른 설정
+   색은 하루이음 '노을 주황'(#EF6B3F)과 '자두'(#7B2F55), 숫자·시계 글꼴은 Nunito (3.0.1)
    색·모서리·그림자는 전부 디자인 테마 변수(skins.css 의 --sk-*, 강조색 --brand-*)를 써서
    11가지 테마 어디서나 맞게 보임. 'aurora' 테마만의 값(유리·배경 그림)은 맨 아래에.
    단위는 rem (responsive.css 가 창 크기에 맞춰 rem 을 바꿈)
@@ -30,9 +31,6 @@ body.font-sans { font-family: var(--sk-font); }
 .sb-tb-btn:hover { background: var(--sk-header-chip-hover); }
 .sb-tb-icon { width: 2.5rem; padding: 0; justify-content: center; }
 .sb-tb-btn svg { width: 1.2rem; height: 1.2rem; }
-.sb-ws-dots { display: inline-flex; align-items: center; gap: 0.25rem; }
-.sb-ws-dots i { display: block; width: 0.5rem; height: 0.5rem; border-radius: 999px; background: currentColor; opacity: 0.5; }
-.sb-ws-dots i:first-child { width: 1.15rem; opacity: 1; }
 #btn-activities[aria-expanded="true"] { background: var(--sk-header-text); color: var(--sk-header-bg); }
 .sb-tb-title { margin: 0; font-size: 1.15rem; font-weight: 800; letter-spacing: 0.01em; color: var(--sk-header-logo); cursor: pointer; white-space: nowrap; user-select: none; }
 .sb-tb-title:hover { opacity: 0.8; }
@@ -137,7 +135,7 @@ body.sb-bell-off .sb-qs-ind-bell::after { content: ""; position: absolute; left:
 .sb-now-badge { flex: none; font-size: 0.82rem; font-weight: 800; padding: 0.3rem 0.75rem; border-radius: 999px; background: rgb(var(--sk-surface-3)); color: rgb(var(--sk-text-2)); }
 .sb-now-badge[data-live="true"] { background: var(--brand-100); color: var(--brand-800); }
 .sb-now-clock {
-  font-family: "Ubuntu", var(--sk-font); font-weight: 300; font-size: min(4.6rem, 17cqw); line-height: 1.02;
+  font-family: "Nunito", var(--sk-font); font-weight: 300; font-size: min(4.6rem, 17cqw); line-height: 1.02;
   letter-spacing: -0.04em; color: rgb(var(--sk-text-1)); white-space: nowrap; cursor: pointer;
 }
 .sb-now-clock:hover { color: var(--brand-600); }
@@ -205,7 +203,7 @@ body.sb-bell-off .sb-qs-ind-bell::after { content: ""; position: absolute; left:
   background: transparent; color: rgb(var(--sk-text-2)); cursor: pointer; transition: background-color 0.15s ease;
 }
 .sb-bt-btn:hover { background: rgb(var(--sk-surface-3)); }
-.sb-bt-b { font-family: "Ubuntu", sans-serif; font-weight: 700; font-size: 1.15rem; }
+.sb-bt-b { font-family: "Nunito", sans-serif; font-weight: 800; font-size: 1.15rem; }
 .sb-bt-i { font-family: "Nanum Myeongjo", serif; font-style: italic; font-size: 1.2rem; }
 #sb-board .sb-bt-select { min-height: 2.5rem; max-width: 8.75rem; padding: 0 0.55rem; border: 0; border-radius: 0.75rem; background: rgb(var(--sk-surface-3)); font: inherit; font-size: 0.9rem; font-weight: 700; color: rgb(var(--sk-text-1)); cursor: pointer; }
 #sb-board .sb-bt-size { width: 2.9rem; border: 0; background: transparent; text-align: center; font: inherit; font-size: 1rem; font-weight: 800; color: rgb(var(--sk-text-1)); box-shadow: none; }
@@ -232,11 +230,11 @@ body.sb-bell-off .sb-qs-ind-bell::after { content: ""; position: absolute; left:
 .sb-ev-name { font-size: 0.98rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 도구 색 (아이콘 칸) */
-.sb-tone-plum { background: #77216f; } .sb-tone-orange { background: #c2410c; } .sb-tone-teal { background: #0f766e; }
+.sb-tone-plum { background: #7b2f55; } .sb-tone-orange { background: #c2410c; } .sb-tone-teal { background: #0f766e; }
 .sb-tone-amber { background: #b45309; } .sb-tone-red { background: #dc2626; } .sb-tone-violet { background: #7c3aed; }
 .sb-tone-pink { background: #db2777; } .sb-tone-green { background: #15803d; } .sb-tone-gold { background: #a16207; }
 .sb-tone-slate { background: #334155; } .sb-tone-sky { background: #0369a1; } .sb-tone-rose { background: #be123c; }
-.sb-tone-aubergine { background: #5e2750; } .sb-tone-ink { background: #2a1027; } .sb-tone-graphite { background: #3f3f46; }
+.sb-tone-aubergine { background: #553052; } .sb-tone-ink { background: #2b1029; } .sb-tone-graphite { background: #3f3f46; }
 .sb-tone-glass { background: rgb(var(--sk-surface)); color: rgb(var(--sk-text-1)) !important; box-shadow: inset 0 0 0 1px rgb(var(--sk-line)), 0 6px 14px -8px rgba(0, 0, 0, 0.35) !important; }
 
 /* ---------------------------------------------------------------- Dock */
@@ -284,7 +282,7 @@ body.sb-focus .sb-dock-peek {
 }
 body.sb-focus.sb-dock-open .sb-dock-peek svg { transform: rotate(180deg); }
 
-/* ---------------------------------------------------------------- 활동 개요 */
+/* ---------------------------------------------------------------- 모든 도구 모아 보기 (개요) */
 .sb-overview {
   position: fixed; inset: 0; z-index: 118; overflow-y: auto; display: flex; justify-content: center;
   background: rgb(var(--sk-ink-2) / 0.66);
@@ -292,7 +290,7 @@ body.sb-focus.sb-dock-open .sb-dock-peek svg { transform: rotate(180deg); }
   animation: sb-fade 0.2s ease-out;
 }
 .sb-overview[hidden] { display: none; }
-/* 개요를 여는 동안 떠 있는 창(타이머·노트·학습 약속 …)은 숨김 — Ubuntu 개요에서 창이 작아지듯 */
+/* 개요를 여는 동안 떠 있는 창(타이머·노트·학습 약속 …)은 숨김 — 개요에 집중하게 */
 body.sb-ov-open .sb-floating { visibility: hidden !important; }
 @keyframes sb-fade { from { opacity: 0; } to { opacity: 1; } }
 .sb-ov-content { width: min(72rem, 100%); box-sizing: border-box; padding: 2.25rem 1.5rem 2.5rem; display: flex; flex-direction: column; align-items: center; gap: 1.75rem; color: #fff; animation: sb-zoom 0.24s cubic-bezier(0.2, 0.9, 0.3, 1.1); }
@@ -322,7 +320,7 @@ body.sb-ov-open .sb-floating { visibility: hidden !important; }
 .sb-ov-lines { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.7rem 0.95rem; font-family: "Jua", var(--sk-font); font-size: 1rem; line-height: 1.35; min-width: 0; overflow: hidden; }
 .sb-ov-lines span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sb-ov-lines span:first-child { font-size: 1.15rem; }
-.sb-ov-thumb .sb-ov-lines span:first-child { color: #77216f; }
+.sb-ov-thumb .sb-ov-lines span:first-child { color: #7b2f55; }
 .sb-ov-thumb.is-dark .sb-ov-lines span:first-child { color: #fde68a; }
 .sb-ov-blank { opacity: 0.6; }
 .sb-ov-list { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.85rem; min-width: 0; }
@@ -356,9 +354,9 @@ body.sb-ov-open .sb-floating { visibility: hidden !important; }
 
 /* ============================================================ 'aurora' 디자인 테마 */
 [data-skin="aurora"] {
-  --sk-page: 247 230 220;
+  --sk-page: 249 234 225;
   /* 해 뜨는 언덕 ('하루'의 시작) — 앱 안에 그려 넣은 그림이라 인터넷이 없어도 보임 */
-  --sk-page-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 900' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1440' height='900' fill='%23F7E6DC'/%3E%3Ccircle cx='1130' cy='330' r='190' fill='%23FDBA8C' opacity='.75'/%3E%3Ccircle cx='1130' cy='330' r='120' fill='%23FFD7B8' opacity='.8'/%3E%3Cpath d='M0 520C260 420 520 470 760 520S1220 600 1440 470V900H0Z' fill='%23F3A27A'/%3E%3Cpath d='M0 640C300 560 560 700 900 640S1300 560 1440 620V900H0Z' fill='%23E95420' opacity='.88'/%3E%3Cpath d='M0 760C320 690 700 800 1000 740S1360 700 1440 740V900H0Z' fill='%239B2C6B'/%3E%3Cpath d='M0 860C380 800 760 880 1100 830S1380 820 1440 840V900H0Z' fill='%234A1240'/%3E%3C/svg%3E");
+  --sk-page-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 900' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1440' height='900' fill='%23F9EAE1'/%3E%3Ccircle cx='1130' cy='330' r='190' fill='%23FFC59E' opacity='.75'/%3E%3Ccircle cx='1130' cy='330' r='120' fill='%23FFE0C7' opacity='.8'/%3E%3Cpath d='M0 520C260 420 520 470 760 520S1220 600 1440 470V900H0Z' fill='%23F5B391'/%3E%3Cpath d='M0 640C300 560 560 700 900 640S1300 560 1440 620V900H0Z' fill='%23EF6B3F' opacity='.88'/%3E%3Cpath d='M0 760C320 690 700 800 1000 740S1360 700 1440 740V900H0Z' fill='%23A63E63'/%3E%3Cpath d='M0 860C380 800 760 880 1100 830S1380 820 1440 840V900H0Z' fill='%234A1F45'/%3E%3C/svg%3E");
   --sk-page-size: cover;
   --sk-surface: 255 255 255;
   --sk-surface-2: 250 246 245;
@@ -374,9 +372,9 @@ body.sb-ov-open .sb-floating { visibility: hidden !important; }
   --sk-text-4: 107 78 99;
   --sk-text-5: 138 112 130;
   --sk-text-6: 190 170 182;
-  --sk-ink: 44 0 30;
-  --sk-ink-2: 30 6 24;
-  --sk-overlay: 30 6 24;
+  --sk-ink: 43 16 41;
+  --sk-ink-2: 30 14 32;
+  --sk-overlay: 30 14 32;
   --sk-r1: 0.85rem;
   --sk-r2: 1.1rem;
   --sk-r3: 1.6rem;
@@ -385,11 +383,11 @@ body.sb-ov-open .sb-floating { visibility: hidden !important; }
   --sk-shadow-lg: 0 20px 40px -18px rgba(74, 18, 64, 0.36);
   --sk-shadow-xl: 0 26px 50px -20px rgba(74, 18, 64, 0.4);
   --sk-shadow-2xl: 0 34px 70px -24px rgba(44, 0, 30, 0.5);
-  --sk-font: "Ubuntu", "Nanum Gothic", sans-serif;
-  --sk-font-heading: "Ubuntu", "Nanum Gothic", sans-serif;
+  --sk-font: "Nunito", "Nanum Gothic", sans-serif;
+  --sk-font-heading: "Nunito", "Nanum Gothic", sans-serif;
   --sk-saturate: 1;
   --panel-bg: rgb(255 255 255 / 0.72);
-  --sk-header-bg: rgba(30, 8, 26, 0.84);
+  --sk-header-bg: rgba(38, 18, 40, 0.86);
   --sk-header-image: none;
   --sk-header-line: rgba(255, 255, 255, 0.06);
   --sk-header-logo: #ffffff;
@@ -398,7 +396,7 @@ body.sb-ov-open .sb-floating { visibility: hidden !important; }
   --sk-header-chip-hover: rgba(255, 255, 255, 0.18);
   --sk-header-chip-line: transparent;
   --sk-header-chip-text: #ffffff;
-  --sk-header-gear-bg: #e95420;
+  --sk-header-gear-bg: #ef6b3f;
   --sk-header-gear-text: #ffffff;
 }
 [data-skin="aurora"] body { background-position: center bottom; background-repeat: no-repeat; background-attachment: fixed; }
@@ -415,7 +413,7 @@ body.sb-ov-open .sb-floating { visibility: hidden !important; }
 [data-skin="aurora"] .sb-tt .timetable-slot { background-color: rgba(255, 255, 255, 0.55); border-color: rgba(42, 16, 39, 0.08); }
 [data-skin="aurora"] .sb-tt .timetable-slot.bg-brand-500 { border-color: var(--brand-400) !important; }
 [data-skin="aurora"] #sb-quick {
-  --qs-bg: rgba(40, 12, 34, 0.92); --qs-text: #ffffff; --qs-muted: rgba(255, 255, 255, 0.8);
+  --qs-bg: rgba(44, 22, 46, 0.93); --qs-text: #ffffff; --qs-muted: rgba(255, 255, 255, 0.8);
   --qs-tile: rgba(255, 255, 255, 0.1); --qs-tile-hover: rgba(255, 255, 255, 0.18); --qs-line: rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(28px) saturate(1.6); -webkit-backdrop-filter: blur(28px) saturate(1.6);
 }

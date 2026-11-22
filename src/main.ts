@@ -37,10 +37,11 @@ import "@fontsource/nanum-myeongjo/700.css";
 import "@fontsource/poor-story";
 import "@fontsource/gamja-flower";
 import "@fontsource/nanum-gothic/800.css";
-import "@fontsource/ubuntu/300.css";
-import "@fontsource/ubuntu/400.css";
-import "@fontsource/ubuntu/500.css";
-import "@fontsource/ubuntu/700.css";
+import "@fontsource/nunito/300.css";
+import "@fontsource/nunito/400.css";
+import "@fontsource/nunito/600.css";
+import "@fontsource/nunito/700.css";
+import "@fontsource/nunito/800.css";
 import "./tailwind.css";
 import "./responsive.css";
 import "./floating.css";
@@ -154,7 +155,7 @@ async function boot() {
   migrateToV3();        // 3.0.0 처음 실행: 새 디자인으로 (legacy 가 설정을 읽기 전에)
   initSkins();          // 디자인 테마 (legacy 가 바탕색을 덧입히기 전에)
   startLegacyApp();
-  // 3.0.0 새 화면: 수업 상태·빠른 설정·활동 개요·집중 모드·위젯 (문제가 생겨도 나머지 시작은 계속)
+  // 3.0 새 화면: 수업 상태·빠른 설정·모든 도구 모아 보기·집중 모드·위젯 (문제가 생겨도 나머지 시작은 계속)
   try { initShell(); } catch (e) { console.error("새 화면 준비 실패:", e); }
   initFloatingPanels();
   initFit();            // Dock 너비 맞춤

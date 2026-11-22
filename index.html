@@ -12,7 +12,8 @@
         [data-theme="orange"] { --brand-50: #fff7ed; --brand-100: #ffedd5; --brand-300: #fdba74; --brand-400: #fb923c; --brand-500: #f97316; --brand-600: #ea580c; --brand-700: #c2410c; --brand-800: #7c2d12; }
         [data-theme="pink"] { --brand-50: #fdf2f8; --brand-100: #fce7f3; --brand-300: #f9a8d4; --brand-400: #f472b6; --brand-500: #ec4899; --brand-600: #db2777; --brand-700: #be185d; --brand-800: #831843; }
         [data-theme="purple"] { --brand-50: #faf5ff; --brand-100: #f3e8ff; --brand-300: #d8b4fe; --brand-400: #c084fc; --brand-500: #a855f7; --brand-600: #9333ea; --brand-700: #7e22ce; --brand-800: #581c87; }
-        [data-theme="ubuntu"] { --brand-50: #fdf1ec; --brand-100: #fbe3d8; --brand-300: #f4a582; --brand-400: #f07a4f; --brand-500: #e95420; --brand-600: #c2410c; --brand-700: #9a3412; --brand-800: #77216f; }
+        /* 3.0.1 하루이음 '노을 주황' + '자두' (3.0.0 의 'ubuntu' 값도 같은 색으로) */
+        [data-theme="noeul"], [data-theme="ubuntu"] { --brand-50: #fef3ee; --brand-100: #fde4d8; --brand-300: #f8ad8c; --brand-400: #f48a61; --brand-500: #ef6b3f; --brand-600: #c4471f; --brand-700: #9c3517; --brand-800: #7b2f55; }
         [data-theme="teal"] { --brand-50: #f0fdfa; --brand-100: #ccfbf1; --brand-300: #5eead4; --brand-400: #2dd4bf; --brand-500: #14b8a6; --brand-600: #0d9488; --brand-700: #0f766e; --brand-800: #115e59; }
         @keyframes bounce-short { 0%, 20%, 50%, 80%, 100% {transform: translateY(0);} 40% {transform: translateY(-20px);} 60% {transform: translateY(-10px);} }
         .animate-bounce-short { animation: bounce-short 1s ease-out 1; }
@@ -54,18 +55,18 @@
 <body class="font-sans text-slate-800 h-screen flex flex-col overflow-hidden text-[1.125rem]" data-theme="default">
 
     <!-- ============================================================
-         3.0.0 하루이음 Aurora 화면 뼈대
-         - 상단 바(Ubuntu 처럼): 왼쪽 '활동', 가운데 지금 수업 상태, 오른쪽 날씨·빠른 설정
+         3.0 하루이음 Aurora 화면 뼈대
+         - 상단 바: 왼쪽 '모든 도구', 가운데 지금 수업 상태, 오른쪽 날씨·빠른 설정
          - 왼쪽 사이드바: 큰 시계(지금 카드) + 오늘의 시간표
          - 가운데 판서 창: 머리줄(보관·기록 | 판서/알림장 | 배경·지우기·집중) + 아래쪽 떠 있는 도구 모음
          - 오른쪽 위젯(넓은 화면): 오늘 급식, 학사일정
-         - 맨 아래 Dock(macOS 처럼): 도구 버튼
+         - 맨 아래 Dock: 도구 버튼
          기능 코드(legacy-app.js)가 쓰는 id·onclick 은 전부 예전 그대로 둠. 새 동작은 src/shell.ts
          ============================================================ -->
     <header id="sb-topbar" class="sb-topbar shrink-0">
         <div class="sb-tb-side">
-            <button id="btn-activities" type="button" class="sb-tb-btn sb-tb-activities" onclick="window.shell.toggleOverview()" aria-haspopup="dialog" aria-expanded="false" title="모든 도구 보기">
-                <span class="sb-ws-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>활동</span>
+            <button id="btn-activities" type="button" class="sb-tb-btn sb-tb-activities" onclick="window.shell.toggleOverview()" aria-haspopup="dialog" aria-expanded="false" title="모든 도구·설정 모아 보기">
+                <i data-lucide="layout-grid" class="w-5 h-5"></i><span>모든 도구</span>
             </button>
             <h1 onclick="showVersionInfo()" class="sb-tb-title" title="버전 정보 보기">하루이음</h1>
         </div>
@@ -186,7 +187,7 @@
 
                 <div id="notepad-editor" style="font-size: 32px;" class="flex-1 p-8 text-slate-800 overflow-y-auto w-full h-full outline-none relative"></div>
 
-                <!-- 판서 도구 (macOS 프리폼처럼 판 아래쪽에 떠 있는 알약) -->
+                <!-- 판서 도구 (판 아래쪽에 떠 있는 알약) -->
                 <div class="sb-board-tools-wrap">
                     <div id="notepad-toolbar" class="sb-board-tools" role="toolbar" aria-label="판서 도구">
                         <select id="board-font-select" onchange="changeBoardFontFamily(this.value)" class="sb-bt-select" aria-label="글꼴">
@@ -264,7 +265,7 @@
             </aside>
         </div>
 
-        <!-- Dock: 도구 버튼 (macOS Dock 처럼 아래쪽 유리 막대, 손을 올리면 커짐 · 열려 있는 도구는 아래 점) -->
+        <!-- Dock: 도구 버튼 (아래쪽 유리 막대, 손을 올리면 커짐 · 열려 있는 도구는 아래 점) -->
         <nav id="sb-dock" class="sb-dock" aria-label="도구 모음">
             <div id="sb-dock-inner" class="sb-dock-inner">
                 <div id="toolbar-tools" class="sb-dock-tools">
@@ -280,15 +281,15 @@
                     <button id="btn-tool-qr" type="button" onclick="window.qr.open()" class="sb-dock-item" title="링크를 QR 코드로"><span class="sb-tile sb-tone-slate"><i data-lucide="qr-code"></i></span><span class="sb-dock-label">QR</span><span class="sb-run" aria-hidden="true"></span></button>
                 </div>
                 <span class="sb-dock-sep" aria-hidden="true"></span>
-                <button id="btn-dock-overview" type="button" onclick="window.shell.toggleOverview(true)" class="sb-dock-item" title="모든 도구 (활동 개요)"><span class="sb-tile sb-tone-glass"><i data-lucide="layout-grid"></i></span><span class="sb-dock-label">모든 도구</span><span class="sb-run" aria-hidden="true"></span></button>
+                <button id="btn-dock-overview" type="button" onclick="window.shell.toggleOverview(true)" class="sb-dock-item" title="모든 도구·설정 모아 보기"><span class="sb-tile sb-tone-glass"><i data-lucide="layout-grid"></i></span><span class="sb-dock-label">모든 도구</span><span class="sb-run" aria-hidden="true"></span></button>
                 <button type="button" onclick="openToolSettings()" class="sb-dock-item" title="도구 상세 설정"><span class="sb-tile sb-tone-glass"><i data-lucide="settings-2"></i></span><span class="sb-dock-label">도구 설정</span><span class="sb-run" aria-hidden="true"></span></button>
             </div>
         </nav>
         <button id="sb-dock-peek" type="button" class="sb-dock-peek" onclick="window.shell.peekDock()" aria-expanded="false"><i data-lucide="chevron-up" class="w-4 h-4"></i><span>도구 모음</span></button>
     </div>
 
-    <!-- 활동 개요 (Ubuntu 의 '활동' 화면처럼 열린 화면 + 모든 도구 + 검색) -->
-    <div id="sb-overview" class="sb-overview" role="dialog" aria-modal="true" aria-label="활동 개요 — 모든 도구" hidden>
+    <!-- 모든 도구 모아 보기: 열린 화면 + 모든 도구 + 검색 -->
+    <div id="sb-overview" class="sb-overview" role="dialog" aria-modal="true" aria-label="모든 도구 모아 보기" hidden>
         <div class="sb-ov-content">
             <div class="sb-ov-search">
                 <label for="sb-ov-input" class="sr-only">도구 검색</label>
@@ -672,7 +673,7 @@
                     <div class="border-t border-slate-200 pt-5">
                         <h3 class="text-lg font-bold text-slate-800 mb-3">강조 색상</h3>
                         <div class="flex gap-2.5">
-                            <button onclick="changeTheme('ubuntu')" class="w-10 h-10 rounded-full bg-[#e95420] border-2 border-white shadow-md hover:scale-110 transition-transform" title="우분투 주황 (오로라 기본)" aria-label="우분투 주황"></button>
+                            <button onclick="changeTheme('noeul')" class="w-10 h-10 rounded-full bg-[#ef6b3f] border-2 border-white shadow-md hover:scale-110 transition-transform" title="노을 주황 (오로라 기본)" aria-label="노을 주황"></button>
                             <button onclick="changeTheme('default')" class="w-10 h-10 rounded-full bg-[#4f46e5] border-2 border-white shadow-md hover:scale-110 transition-transform"></button>
                             <button onclick="changeTheme('green')" class="w-10 h-10 rounded-full bg-[#10b981] border-2 border-white shadow-md hover:scale-110 transition-transform"></button>
                             <button onclick="changeTheme('orange')" class="w-10 h-10 rounded-full bg-[#f97316] border-2 border-white shadow-md hover:scale-110 transition-transform"></button>

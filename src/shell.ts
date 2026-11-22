@@ -3,7 +3,7 @@
 //  - 지금 수업 상태: 상단 바 가운데 알약 + 왼쪽 '지금' 카드 (몇 교시 · 몇 분 남음 · 진행 막대)
 //  - 판서/알림장 전환 버튼 (기능 코드의 toggleBoardMode 를 그대로 씀)
 //  - 빠른 설정: 음량 · 수업 종 · 항상 위 · 전체 화면 · PC 켜면 실행 · 디자인 테마
-//  - 활동 개요: 열린 화면(판서·알림장·지난 기록) + 모든 도구 + 검색
+//  - 모든 도구 모아 보기: 열린 화면(판서·알림장·지난 기록) + 모든 도구 + 검색
 //  - 집중 모드: 판서만 크게 (사이드바·위젯·Dock 숨김, '도구 모음' 버튼으로 잠깐 꺼내기)
 //  - Dock: 열려 있는 도구 아래에 점 표시
 //  - 오른쪽 위젯: 오늘 급식, 다가오는 학사일정
@@ -148,7 +148,7 @@ export async function toggleAutostart() {
   await syncAutostart();
 }
 
-// ---------------------------------------------------------------- 활동 개요
+// ---------------------------------------------------------------- 모든 도구 모아 보기
 interface Tool { key: string; label: string; icon: string; tone: string; words: string; run: () => void }
 const openSettingsAt = (id: string) => { call("openSettingsModal"); window.setTimeout(() => $(id)?.scrollIntoView({ block: "start", behavior: "smooth" }), 120); };
 const TOOLS: Tool[] = [
