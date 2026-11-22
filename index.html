@@ -12,6 +12,7 @@
         [data-theme="orange"] { --brand-50: #fff7ed; --brand-100: #ffedd5; --brand-300: #fdba74; --brand-400: #fb923c; --brand-500: #f97316; --brand-600: #ea580c; --brand-700: #c2410c; --brand-800: #7c2d12; }
         [data-theme="pink"] { --brand-50: #fdf2f8; --brand-100: #fce7f3; --brand-300: #f9a8d4; --brand-400: #f472b6; --brand-500: #ec4899; --brand-600: #db2777; --brand-700: #be185d; --brand-800: #831843; }
         [data-theme="purple"] { --brand-50: #faf5ff; --brand-100: #f3e8ff; --brand-300: #d8b4fe; --brand-400: #c084fc; --brand-500: #a855f7; --brand-600: #9333ea; --brand-700: #7e22ce; --brand-800: #581c87; }
+        [data-theme="ubuntu"] { --brand-50: #fdf1ec; --brand-100: #fbe3d8; --brand-300: #f4a582; --brand-400: #f07a4f; --brand-500: #e95420; --brand-600: #c2410c; --brand-700: #9a3412; --brand-800: #77216f; }
         [data-theme="teal"] { --brand-50: #f0fdfa; --brand-100: #ccfbf1; --brand-300: #5eead4; --brand-400: #2dd4bf; --brand-500: #14b8a6; --brand-600: #0d9488; --brand-700: #0f766e; --brand-800: #115e59; }
         @keyframes bounce-short { 0%, 20%, 50%, 80%, 100% {transform: translateY(0);} 40% {transform: translateY(-20px);} 60% {transform: translateY(-10px);} }
         .animate-bounce-short { animation: bounce-short 1s ease-out 1; }
@@ -52,130 +53,143 @@
 </head>
 <body class="font-sans text-slate-800 h-screen flex flex-col overflow-hidden text-[1.125rem]" data-theme="default">
 
-    <!-- HEADER -->
-    <header class="flex items-center justify-between px-8 py-5 bg-white shadow-sm z-10 shrink-0">
-        <div class="flex items-center space-x-6">
-            <h1 onclick="showVersionInfo()" class="text-4xl font-bold text-brand-700 tracking-tight flex items-center cursor-pointer hover:opacity-80 select-none" title="버전 정보 보기">
-                <i data-lucide="monitor-play" class="mr-3 w-10 h-10"></i>하루이음
-            </h1>
-            <div onclick="openWeather()" class="flex items-center space-x-5 bg-slate-50 hover:bg-slate-100 cursor-pointer px-5 py-3 rounded-2xl border border-slate-200 shadow-sm transition-colors" title="상세 날씨 보기">
-                <div class="flex items-center text-xl font-bold text-slate-700">
-                    <span id="header-weather-icon-container"><i data-lucide="loader-2" class="mr-2 text-slate-400 w-6 h-6 animate-spin"></i></span>
-                    <span id="header-weather-text">날씨 확인 중...</span>
-                </div>
-                <div class="w-px h-6 bg-slate-200"></div>
-                <div class="flex items-center text-lg font-bold text-slate-500" id="header-dust-container">
+    <!-- ============================================================
+         3.0.0 하루이음 Aurora 화면 뼈대
+         - 상단 바(Ubuntu 처럼): 왼쪽 '활동', 가운데 지금 수업 상태, 오른쪽 날씨·빠른 설정
+         - 왼쪽 사이드바: 큰 시계(지금 카드) + 오늘의 시간표
+         - 가운데 판서 창: 머리줄(보관·기록 | 판서/알림장 | 배경·지우기·집중) + 아래쪽 떠 있는 도구 모음
+         - 오른쪽 위젯(넓은 화면): 오늘 급식, 학사일정
+         - 맨 아래 Dock(macOS 처럼): 도구 버튼
+         기능 코드(legacy-app.js)가 쓰는 id·onclick 은 전부 예전 그대로 둠. 새 동작은 src/shell.ts
+         ============================================================ -->
+    <header id="sb-topbar" class="sb-topbar shrink-0">
+        <div class="sb-tb-side">
+            <button id="btn-activities" type="button" class="sb-tb-btn sb-tb-activities" onclick="window.shell.toggleOverview()" aria-haspopup="dialog" aria-expanded="false" title="모든 도구 보기">
+                <span class="sb-ws-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>활동</span>
+            </button>
+            <h1 onclick="showVersionInfo()" class="sb-tb-title" title="버전 정보 보기">하루이음</h1>
+        </div>
+
+        <button id="sb-live" type="button" class="sb-live" onclick="openCalendar()" title="달력·학사일정 보기">
+            <svg class="sb-live-ring" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" class="track"></circle><circle id="sb-live-arc" cx="12" cy="12" r="9" class="arc" stroke-dasharray="0 56.55" transform="rotate(-90 12 12)"></circle></svg>
+            <span id="sb-live-dot" class="sb-live-dot" aria-hidden="true"></span>
+            <span id="sb-live-title" class="sb-live-title">오늘</span>
+            <span id="sb-live-sub" class="sb-live-sub"></span>
+        </button>
+
+        <div class="sb-tb-side sb-tb-right">
+            <button type="button" onclick="openWeather()" class="sb-tb-btn sb-tb-weather" title="상세 날씨 보기">
+                <span id="header-weather-icon-container"><i data-lucide="loader-2" class="mr-2 text-slate-400 w-6 h-6 animate-spin"></i></span>
+                <span id="header-weather-text">날씨 확인 중...</span>
+                <span class="sb-tb-sep" aria-hidden="true"></span>
+                <span class="flex items-center text-lg font-bold text-slate-500" id="header-dust-container">
                     <i data-lucide="wind" class="mr-2 w-6 h-6"></i>
                     <span id="header-dust-text">미세먼지 확인 중</span>
-                </div>
-            </div>
-        </div>
-        <div class="flex items-center space-x-6">
-            <div class="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200 shadow-inner">
-                <button id="btn-always-on-top" onclick="toggleAlwaysOnTop()" class="px-4 py-2 hover:bg-white text-slate-600 hover:text-brand-600 rounded-lg text-lg font-bold transition flex items-center shadow-sm" title="항상 위">
-                    <i data-lucide="pin" class="w-5 h-5 mr-1.5"></i>항상위
-                </button>
-                <div class="w-px bg-slate-300 mx-1.5"></div>
-                <button onclick="toggleFullscreen()" class="px-4 py-2 hover:bg-white text-slate-600 hover:text-brand-600 rounded-lg text-lg font-bold transition flex items-center shadow-sm" title="전체 화면">
-                    <i data-lucide="maximize" class="w-5 h-5 mr-1.5"></i>최대화
-                </button>
-            </div>
-            <div onclick="openCalendar()" class="flex items-center text-slate-700 font-bold bg-slate-50 hover:bg-slate-100 cursor-pointer px-6 py-3 rounded-xl border border-slate-200 shadow-sm transition-colors text-2xl" title="달력 보기">
-                <i data-lucide="calendar" class="mr-3 w-8 h-8 text-brand-500"></i>
-                <span id="current-date-text"></span>
-            </div>
-            
-            <div class="w-[20rem] text-center shrink-0 flex justify-center">
-                <div onclick="openTimeSettingsModal()" class="text-5xl font-bold text-slate-800 tracking-tighter cursor-pointer hover:text-brand-600 transition-colors inline-block tabular-nums whitespace-nowrap" id="current-time-text" title="시간 및 지정 알람 설정" style="font-family: 'Nanum Gothic', sans-serif;">
-                    00:00:00
-                </div>
-            </div>
-
-            <button onclick="openSettingsModal()" class="p-4 bg-slate-800 hover:bg-slate-700 text-white rounded-full transition-colors shadow-md flex items-center justify-center" title="환경 설정">
-                <i data-lucide="settings" class="w-7 h-7"></i>
+                </span>
             </button>
+            <button id="btn-focus-exit" type="button" class="sb-tb-btn sb-focus-exit" onclick="window.shell.toggleFocus(false)"><i data-lucide="minimize-2" class="w-5 h-5"></i>집중 모드 나가기</button>
+            <button id="btn-quick-settings" type="button" class="sb-tb-btn sb-tb-qs" onclick="window.shell.toggleQuick()" aria-haspopup="dialog" aria-expanded="false" aria-controls="sb-quick" title="빠른 설정 (음량·종·항상 위·테마)">
+                <i data-lucide="volume-2" class="w-5 h-5"></i>
+                <span class="sb-qs-ind sb-qs-ind-bell"><i data-lucide="bell-ring" class="w-5 h-5"></i></span>
+                <span class="sb-qs-ind sb-qs-ind-pin"><i data-lucide="pin" class="w-5 h-5"></i></span>
+                <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                <span class="sr-only">빠른 설정</span>
+            </button>
+            <button type="button" onclick="openSettingsModal()" class="sb-tb-btn sb-tb-icon" title="환경 설정" aria-label="환경 설정"><i data-lucide="settings" class="w-5 h-5"></i></button>
         </div>
     </header>
 
-    <!-- MAIN CONTENT -->
-    <div id="main-layout-container" class="flex flex-1 overflow-hidden p-4 gap-4 h-full relative transition-all duration-500">
-        <!-- 시간표 판넬 -->
-        <div class="w-[32%] panel-bg rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden min-w-[25rem] max-w-[27.5rem]">
-            <div class="bg-brand-600 px-5 py-3 text-white flex justify-between items-center shrink-0 transition-colors duration-300">
-                <div class="flex items-center shrink-0">
-                    <h2 class="font-bold text-2xl flex items-center mr-3 whitespace-nowrap">
-                        <i data-lucide="clock" class="mr-2 w-6 h-6 shrink-0"></i>오늘의 시간표
-                    </h2>
-                </div>
-                <div class="flex items-center space-x-3 min-w-0">
-                    <div class="flex items-center space-x-2 bg-slate-800/40 px-3 py-1.5 rounded-xl min-w-0" title="알람 볼륨">
-                        <i data-lucide="volume-2" class="w-5 h-5 shrink-0"></i>
-                        <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.5" class="w-16 min-w-[2rem] shrink h-1 cursor-pointer accent-white">
-                        <span id="volume-val" class="text-sm font-bold text-white w-9 text-right tabular-nums">50%</span>
-                    </div>
-                    <button onclick="openAlarmSettingsModal()" class="p-1.5 hover:bg-slate-800/40 rounded-xl transition-colors" title="교시 알람 상세 설정">
-                        <i data-lucide="bell-ring" class="w-6 h-6"></i>
-                    </button>
-                </div>
-            </div>
-            <div id="timetable-container" class="p-3 flex-1 flex flex-col justify-between gap-1.5 overflow-y-auto"></div>
+    <!-- 빠른 설정 (GNOME 처럼 오른쪽 위에서 내려오는 작은 창) -->
+    <div id="sb-quick" class="sb-quick" role="dialog" aria-label="빠른 설정" hidden>
+        <div class="sb-qs-head">
+            <span>빠른 설정</span>
+            <button type="button" class="sb-qs-x" onclick="window.shell.toggleQuick(false)" aria-label="빠른 설정 닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
         </div>
-
-        <!-- 툴바 + 칠판 영역 -->
-        <div id="right-layout-container" class="flex-1 flex flex-col gap-4 min-w-0 relative transition-all duration-500">
-            <!-- TOOLBAR -->
-            <div class="panel-bg rounded-3xl shadow-sm border border-slate-200 p-3 px-5 flex items-center gap-4 shrink-0 overflow-hidden">
-                <div id="toolbar-tools" class="flex items-center gap-4 flex-1">
-                    <button id="btn-tool-picker" onclick="pickRandomNumber()" class="group flex items-center px-6 py-4 bg-gradient-to-br from-purple-500 to-indigo-600 text-white rounded-2xl hover:shadow-lg transition-all transform hover:-translate-y-1 font-bold text-xl whitespace-nowrap cursor-pointer">
-                        <i data-lucide="dices" class="mr-3 w-8 h-8 group-hover:animate-bounce-short"></i> 뽑기
-                    </button>
-                    <button id="btn-tool-timer" onclick="toggleTimerPopup()" class="group flex items-center px-6 py-4 bg-gradient-to-br from-blue-500 to-cyan-500 text-white rounded-2xl hover:shadow-lg transition-all transform hover:-translate-y-1 font-bold text-xl whitespace-nowrap cursor-pointer">
-                        <i data-lucide="timer" class="mr-3 w-8 h-8 group-hover:rotate-12 transition-transform"></i> 타이머
-                    </button>
-                    <button id="btn-tool-noise" onclick="toggleNoiseMeter()" class="group flex items-center px-6 py-4 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-2xl hover:shadow-lg transition-all transform hover:-translate-y-1 font-bold text-xl whitespace-nowrap cursor-pointer">
-                        <i data-lucide="ear" class="mr-3 w-8 h-8 group-hover:scale-110 transition-transform"></i> 소음측정
-                    </button>
-                    <button id="btn-tool-attention" onclick="playAttentionBell()" class="group flex items-center px-6 py-4 bg-gradient-to-br from-rose-500 to-red-500 text-white rounded-2xl hover:shadow-lg transition-all transform hover:-translate-y-1 font-bold text-xl whitespace-nowrap cursor-pointer">
-                        <i data-lucide="bell-electric" class="mr-3 w-8 h-8 group-hover:scale-110 transition-transform"></i> 주목!
-                    </button>
-                    <button id="btn-tool-youtube" onclick="openYouTube()" class="group flex items-center px-6 py-4 bg-gradient-to-br from-red-600 to-red-700 text-white rounded-2xl hover:shadow-lg transition-all transform hover:-translate-y-1 font-bold text-xl whitespace-nowrap cursor-pointer">
-                        <i data-lucide="youtube" class="mr-3 w-8 h-8 group-hover:scale-110 transition-transform"></i> 유튜브
-                    </button>
-                    <button id="btn-tool-tinkerbell" onclick="openExternalSite('tinkerbell')" class="group flex items-center px-6 py-4 bg-gradient-to-br from-sky-500 to-blue-600 text-white rounded-2xl hover:shadow-lg transition-all transform hover:-translate-y-1 font-bold text-xl whitespace-nowrap cursor-pointer" title="팅커벨 (tkbell.co.kr)">
-                        <i data-lucide="sparkles" class="mr-3 w-8 h-8 group-hover:scale-110 transition-transform"></i> 팅커벨
-                    </button>
-                    <button id="btn-tool-iscream" onclick="openExternalSite('iscream')" class="group flex items-center px-6 py-4 bg-gradient-to-br from-pink-500 to-rose-500 text-white rounded-2xl hover:shadow-lg transition-all transform hover:-translate-y-1 font-bold text-xl whitespace-nowrap cursor-pointer" title="아이스크림 (i-scream.co.kr)">
-                        <i data-lucide="ice-cream-cone" class="mr-3 w-8 h-8 group-hover:scale-110 transition-transform"></i> 아이스크림
-                    </button>
-                    <button id="btn-tool-lunch" onclick="openLunchModal()" class="group flex items-center px-6 py-4 bg-gradient-to-br from-emerald-500 to-teal-500 text-white rounded-2xl hover:shadow-lg transition-all transform hover:-translate-y-1 font-bold text-xl whitespace-nowrap cursor-pointer">
-                        <i data-lucide="utensils" class="mr-3 w-8 h-8 group-hover:scale-110 transition-transform"></i> 급식
-                    </button>
-                    <button id="btn-tool-popupnote" onclick="togglePopupNote()" class="group flex items-center px-6 py-4 bg-gradient-to-br from-amber-400 to-orange-400 text-white rounded-2xl hover:shadow-lg transition-all transform hover:-translate-y-1 font-bold text-xl whitespace-nowrap cursor-pointer">
-                        <i data-lucide="sticky-note" class="mr-3 w-8 h-8 group-hover:scale-110 transition-transform"></i> 팝업노트
-                    </button>
-                    <button id="btn-tool-qr" onclick="window.qr.open()" class="group flex items-center px-6 py-4 bg-gradient-to-br from-slate-600 to-slate-800 text-white rounded-2xl hover:shadow-lg transition-all transform hover:-translate-y-1 font-bold text-xl whitespace-nowrap cursor-pointer" title="링크를 QR 코드로">
-                        <i data-lucide="qr-code" class="mr-3 w-8 h-8 group-hover:scale-110 transition-transform"></i> QR
-                    </button>
-                </div>
-                <button onclick="openToolSettings()" class="p-4 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition shrink-0" title="도구 상세 설정">
-                    <i data-lucide="settings-2" class="w-8 h-8"></i>
-                </button>
-            </div>
-
-            <!-- NOTEPAD (칠판) -->
-            <div class="flex-1 panel-bg rounded-3xl shadow-sm border border-slate-200 flex flex-col overflow-hidden min-h-0 relative">
-                <div class="bg-slate-50/50 px-5 py-2.5 border-b border-slate-200 flex items-center justify-start shrink-0 overflow-x-auto hide-scrollbar gap-4" id="notepad-toolbar">
-                    <div class="flex items-center shrink-0">
-                        <h2 id="board-toggle-btn" onclick="toggleBoardMode()" class="font-bold text-slate-700 flex items-center text-3xl whitespace-nowrap cursor-pointer hover:text-brand-600 transition-all group w-[7.5rem] shrink-0 select-none" title="판서/알림 모드 전환">
-    <div class="w-10 h-10 flex items-center justify-center mr-1">
-        <i id="board-mode-icon" data-lucide="edit-3" class="w-8 h-8 text-brand-500 group-hover:scale-110"></i>
+        <div class="sb-qs-vol">
+            <i data-lucide="volume-2" class="w-5 h-5 shrink-0"></i>
+            <label for="volume-slider" class="sb-qs-label">종·알람 음량</label>
+            <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.5" class="cursor-pointer">
+            <span id="volume-val" class="sb-qs-val tabular-nums">50%</span>
+        </div>
+        <div class="sb-qs-grid">
+            <button type="button" id="qs-bell" class="sb-qs-tile" aria-pressed="true" onclick="window.shell.toggleBell()"><i data-lucide="bell-ring" class="w-5 h-5 shrink-0"></i><span class="sb-qs-txt"><b>수업 종</b><small id="qs-bell-state">켜짐</small></span></button>
+            <button type="button" id="btn-always-on-top" class="sb-qs-tile" aria-pressed="false" onclick="toggleAlwaysOnTop()"><i data-lucide="pin" class="w-5 h-5 shrink-0"></i><span class="sb-qs-txt"><b>항상 위</b><small id="qs-pin-state">꺼짐</small></span></button>
+            <button type="button" id="qs-fullscreen" class="sb-qs-tile" aria-pressed="false" onclick="toggleFullscreen()"><i data-lucide="maximize" class="w-5 h-5 shrink-0"></i><span class="sb-qs-txt"><b>전체 화면</b><small id="qs-full-state">꺼짐</small></span></button>
+            <button type="button" id="qs-autostart" class="sb-qs-tile" aria-pressed="false" onclick="window.shell.toggleAutostart()"><i data-lucide="power" class="w-5 h-5 shrink-0"></i><span class="sb-qs-txt"><b>PC 켜면 실행</b><small id="qs-auto-state">꺼짐</small></span></button>
+        </div>
+        <div class="sb-qs-skins">
+            <span class="sb-qs-label">디자인 테마</span>
+            <div id="qs-skins" class="sb-qs-swatches"></div>
+        </div>
+        <div class="sb-qs-links">
+            <button type="button" onclick="window.shell.toggleQuick(false); openAlarmSettingsModal()"><i data-lucide="bell-ring" class="w-4 h-4"></i>교시 알람</button>
+            <button type="button" onclick="window.shell.toggleQuick(false); openTimeSettingsModal()"><i data-lucide="alarm-clock" class="w-4 h-4"></i>시간·지정 알람</button>
+            <button type="button" onclick="window.shell.toggleQuick(false); openSettingsModal()"><i data-lucide="settings" class="w-4 h-4"></i>모든 설정</button>
+        </div>
     </div>
-    <span id="board-mode-text" class="inline-block">판서</span>
-</h2>
+
+    <!-- MAIN CONTENT -->
+    <div id="right-layout-container" class="sb-stack">
+        <div id="main-layout-container" class="sb-main">
+            <!-- 왼쪽: 지금 카드 + 시간표 -->
+            <aside id="sb-sidebar" class="sb-sidebar">
+                <section class="sb-card sb-now panel-bg" aria-label="지금">
+                    <div class="sb-now-top">
+                        <button type="button" id="current-date-text" onclick="openCalendar()" class="sb-now-date" title="달력 보기"></button>
+                        <span id="sb-now-badge" class="sb-now-badge" hidden></span>
                     </div>
-                    
-                    <div class="flex items-center space-x-1.5 bg-white px-2 py-1.5 rounded-xl border shadow-sm shrink-0 whitespace-nowrap">
-                        <select id="board-font-select" onchange="changeBoardFontFamily(this.value)" class="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-bold outline-none cursor-pointer text-sm w-24">
+                    <div id="current-time-text" onclick="openTimeSettingsModal()" class="sb-now-clock" title="시간 및 지정 알람 설정">00:00:00</div>
+                    <div class="sb-now-row">
+                        <span id="sb-now-title" class="sb-now-title"></span>
+                        <span id="sb-now-remain" class="sb-now-remain"></span>
+                    </div>
+                    <div class="sb-now-bar" aria-hidden="true"><div id="sb-now-progress"></div></div>
+                </section>
+
+                <section class="sb-card sb-tt panel-bg" aria-label="오늘의 시간표">
+                    <div class="sb-tt-head">
+                        <h2><i data-lucide="clock" class="w-5 h-5 shrink-0"></i>오늘의 시간표</h2>
+                        <button type="button" onclick="openAlarmSettingsModal()" class="sb-icon-btn" title="교시 알람 상세 설정" aria-label="교시 알람 상세 설정"><i data-lucide="bell-ring" class="w-5 h-5"></i></button>
+                    </div>
+                    <div id="timetable-container" class="p-3 flex-1 flex flex-col justify-between gap-1.5 overflow-y-auto"></div>
+                </section>
+            </aside>
+
+            <!-- 가운데: 판서 창 -->
+            <section id="sb-board" class="sb-board panel-bg" aria-label="판서">
+                <div id="board-head" class="sb-board-head">
+                    <div class="sb-bh-group">
+                        <button type="button" onclick="saveBoard()" class="sb-bh-btn" title="현재 내용 기록보관함에 저장"><i data-lucide="archive" class="w-4 h-4"></i><span>보관</span></button>
+                        <button type="button" onclick="openSavedBoards()" class="sb-bh-btn" title="저장 목록 보기"><i data-lucide="folder-open" class="w-4 h-4"></i><span>기록</span></button>
+                    </div>
+                    <div class="sb-seg" role="group" aria-label="판서와 알림장 바꾸기">
+                        <button type="button" id="seg-board" class="sb-seg-btn" aria-pressed="true" onclick="window.shell.setBoardMode('board')"><i data-lucide="pencil" class="w-4 h-4"></i>판서</button>
+                        <button type="button" id="seg-notice" class="sb-seg-btn" aria-pressed="false" onclick="window.shell.setBoardMode('notice')"><i data-lucide="megaphone" class="w-4 h-4"></i>알림장</button>
+                    </div>
+                    <!-- 기능 코드가 판서/알림 이름을 여기에 씀 (화면에는 위 전환 버튼으로 보임) -->
+                    <h2 id="board-toggle-btn" class="hidden" aria-hidden="true"><i id="board-mode-icon" data-lucide="edit-3"></i><span id="board-mode-text">판서</span></h2>
+                    <div class="sb-bh-group sb-bh-right">
+                        <label class="sb-bh-select" title="칠판 배경색상 변경">
+                            <i data-lucide="monitor" class="w-4 h-4"></i>
+                            <select id="board-bg-select" onchange="changeBoardBg(this.value)" aria-label="판 배경">
+                                <option value="inherit">배경 동기화</option>
+                                <option value="#064e3b">칠판(녹색)</option>
+                                <option value="#1e293b">칠판(흑색)</option>
+                                <option value="#ffffff">화이트보드</option>
+                                <option value="#fef9c3">옐로우보드</option>
+                            </select>
+                        </label>
+                        <button type="button" onclick="promptClearNotepad()" class="sb-bh-btn sb-bh-danger" title="전체 지우기" aria-label="전체 지우기"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        <button type="button" id="btn-focus" onclick="window.shell.toggleFocus()" class="sb-bh-btn" title="집중 모드 (판서만 크게)" aria-label="집중 모드" aria-pressed="false"><i data-lucide="maximize-2" class="w-4 h-4"></i></button>
+                    </div>
+                </div>
+
+                <div id="notepad-editor" style="font-size: 32px;" class="flex-1 p-8 text-slate-800 overflow-y-auto w-full h-full outline-none relative"></div>
+
+                <!-- 판서 도구 (macOS 프리폼처럼 판 아래쪽에 떠 있는 알약) -->
+                <div class="sb-board-tools-wrap">
+                    <div id="notepad-toolbar" class="sb-board-tools" role="toolbar" aria-label="판서 도구">
+                        <select id="board-font-select" onchange="changeBoardFontFamily(this.value)" class="sb-bt-select" aria-label="글꼴">
                             <option value='"Jua", "Nanum Gothic", sans-serif'>주아체</option>
                             <option value='"Maplestory", "Nanum Gothic", sans-serif'>메이플스토리체</option>
                             <option value='"Nanum Gothic", sans-serif'>나눔고딕</option>
@@ -186,74 +200,30 @@
                             <option value='serif'>명조</option>
                             <option value='monospace'>타자기</option>
                         </select>
-                        <div class="w-px h-6 bg-slate-200 mx-1"></div>
-                        
-                        <div class="flex items-center bg-slate-50 rounded-lg border border-slate-100">
-                            <button onclick="boardEditor.undo()" class="p-1.5 hover:bg-slate-200 rounded-l-lg text-slate-600 transition" title="되돌리기"><i data-lucide="undo" class="w-4 h-4"></i></button>
-                            <button onclick="boardEditor.redo()" class="p-1.5 hover:bg-slate-200 text-slate-600 transition" title="원래대로 (다시실행)"><i data-lucide="redo" class="w-4 h-4"></i></button>
-                            <div class="w-px h-4 bg-slate-200"></div>
-                            <button onclick="promptClearNotepad()" class="p-1.5 hover:bg-rose-100 rounded-r-lg text-rose-500 transition" title="지우개 (전체 지우기)"><i data-lucide="eraser" class="w-4 h-4"></i></button>
-                        </div>
-                        <div class="w-px h-6 bg-slate-200 mx-1"></div>
-
-                        <div class="flex items-center bg-slate-100 rounded-lg px-1">
-                            <button onclick="adjustBoardFontSize(-2)" class="p-1.5 hover:bg-slate-200 rounded-lg text-slate-600" title="글자 작게"><i data-lucide="minus" class="w-4 h-4"></i></button>
-                            <input type="number" id="board-font-size-input" value="32" onchange="setBoardFontSize(this.value)" class="w-12 text-center bg-transparent font-bold text-slate-800 outline-none text-base" title="글자 크기">
-                            <button onclick="adjustBoardFontSize(2)" class="p-1.5 hover:bg-slate-200 rounded-lg text-slate-600" title="글자 크게"><i data-lucide="plus" class="w-4 h-4"></i></button>
-                        </div>
-                        <div class="w-px h-6 bg-slate-200 mx-1"></div>
-                        <div class="flex items-center bg-slate-50 rounded-lg border border-slate-100">
-                            <button onclick="boardEditor.toggleBold()" class="px-3 py-1.5 hover:bg-slate-200 rounded-l-lg text-slate-700 font-bold text-lg transition" title="굵게">B</button>
-                            <div class="w-px h-4 bg-slate-200"></div>
-                            <button onclick="boardEditor.toggleItalic()" class="px-3 py-1.5 hover:bg-slate-200 rounded-r-lg text-slate-700 italic text-lg font-serif transition" title="기울임꼴">I</button>
-                        </div>
-                        <div class="w-px h-6 bg-slate-200 mx-1"></div>
-                        <div class="flex items-center bg-slate-50 rounded-lg border border-slate-100">
-                            <button onclick="boardEditor.align('left')" class="p-1.5 hover:bg-slate-200 rounded-l-lg text-slate-600" title="왼쪽 정렬"><i data-lucide="align-left" class="w-4 h-4"></i></button>
-                            <button onclick="boardEditor.align('center')" class="p-1.5 hover:bg-slate-200 text-slate-600" title="가운데 정렬"><i data-lucide="align-center" class="w-4 h-4"></i></button>
-                            <button onclick="boardEditor.align('right')" class="p-1.5 hover:bg-slate-200 rounded-r-lg text-slate-600" title="오른쪽 정렬"><i data-lucide="align-right" class="w-4 h-4"></i></button>
-                        </div>
-                        <div class="w-px h-6 bg-slate-200 mx-1"></div>
-                        <button onclick="openTableModal()" class="p-2 bg-slate-50 hover:bg-slate-200 rounded-lg border border-slate-100 text-slate-600 transition" title="표 만들기"><i data-lucide="table" class="w-4 h-4"></i></button>
-                        
-                        <button onclick="document.getElementById('board-image-input').click()" class="p-2 bg-slate-50 hover:bg-slate-200 rounded-lg border border-slate-100 text-slate-600 transition ml-1" title="사진 삽입 (끌어다 놓기도 가능)"><i data-lucide="image" class="w-4 h-4"></i></button>
+                        <span class="sb-bt-sep" aria-hidden="true"></span>
+                        <button type="button" onclick="boardEditor.undo()" class="sb-bt-btn" title="되돌리기" aria-label="되돌리기"><i data-lucide="undo-2" class="w-5 h-5"></i></button>
+                        <button type="button" onclick="boardEditor.redo()" class="sb-bt-btn" title="다시 실행" aria-label="다시 실행"><i data-lucide="redo-2" class="w-5 h-5"></i></button>
+                        <span class="sb-bt-sep" aria-hidden="true"></span>
+                        <button type="button" onclick="adjustBoardFontSize(-2)" class="sb-bt-btn" title="글자 작게" aria-label="글자 작게"><i data-lucide="minus" class="w-5 h-5"></i></button>
+                        <input type="number" id="board-font-size-input" value="32" onchange="setBoardFontSize(this.value)" class="sb-bt-size" title="글자 크기" aria-label="글자 크기">
+                        <button type="button" onclick="adjustBoardFontSize(2)" class="sb-bt-btn" title="글자 크게" aria-label="글자 크게"><i data-lucide="plus" class="w-5 h-5"></i></button>
+                        <span class="sb-bt-sep" aria-hidden="true"></span>
+                        <button type="button" onclick="boardEditor.toggleBold()" class="sb-bt-btn sb-bt-b" title="굵게" aria-label="굵게">B</button>
+                        <button type="button" onclick="boardEditor.toggleItalic()" class="sb-bt-btn sb-bt-i" title="기울임꼴" aria-label="기울임꼴">I</button>
+                        <span class="sb-bt-sep" aria-hidden="true"></span>
+                        <button type="button" onclick="boardEditor.align('left')" class="sb-bt-btn" title="왼쪽 정렬" aria-label="왼쪽 정렬"><i data-lucide="align-left" class="w-5 h-5"></i></button>
+                        <button type="button" onclick="boardEditor.align('center')" class="sb-bt-btn" title="가운데 정렬" aria-label="가운데 정렬"><i data-lucide="align-center" class="w-5 h-5"></i></button>
+                        <button type="button" onclick="boardEditor.align('right')" class="sb-bt-btn" title="오른쪽 정렬" aria-label="오른쪽 정렬"><i data-lucide="align-right" class="w-5 h-5"></i></button>
+                        <span class="sb-bt-sep" aria-hidden="true"></span>
+                        <button type="button" onclick="openTableModal()" class="sb-bt-btn" title="표 만들기" aria-label="표 만들기"><i data-lucide="table" class="w-5 h-5"></i></button>
+                        <button type="button" onclick="document.getElementById('board-image-input').click()" class="sb-bt-btn" title="사진 삽입 (끌어다 놓기도 가능)" aria-label="사진 삽입"><i data-lucide="image" class="w-5 h-5"></i></button>
                         <input type="file" id="board-image-input" accept="image/*" class="hidden" onchange="handleBoardImageUpload(event)">
-                        
-                        <div class="w-px h-6 bg-slate-200 mx-1"></div>
-                        
+                        <span class="sb-bt-sep" aria-hidden="true"></span>
                         <div class="flex space-x-1.5 px-1 items-center" id="board-colors"></div>
-
-                        <div class="w-px h-6 bg-slate-200 mx-1.5"></div>
-                        
-                        <!-- ⭐️ 판서 배경색 선택기 추가 -->
-                        <div class="flex items-center space-x-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100" title="칠판 배경색상 변경">
-                            <i data-lucide="monitor" class="w-4 h-4 text-slate-400"></i>
-                            <select id="board-bg-select" onchange="changeBoardBg(this.value)" class="bg-transparent text-slate-700 font-bold outline-none cursor-pointer text-sm w-[6.5rem]">
-                                <option value="inherit">배경 동기화</option>
-                                <option value="#064e3b">칠판(녹색)</option>
-                                <option value="#1e293b">칠판(흑색)</option>
-                                <option value="#ffffff">화이트보드</option>
-                                <option value="#fef9c3">옐로우보드</option>
-                            </select>
-                        </div>
-
-                        <div class="w-px h-6 bg-slate-200 mx-1.5"></div>
-                        
-                        <div class="flex items-center gap-2 pr-1">
-                            <button onclick="saveBoard()" class="px-4 py-2 w-24 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg flex items-center justify-center font-bold transition shadow-sm border border-indigo-100" title="현재 내용 기록보관함에 저장">
-                                <i data-lucide="save" class="w-4 h-4 mr-1.5"></i> <span class="text-sm">보관</span>
-                            </button>
-                            <button onclick="openSavedBoards()" class="px-4 py-2 w-24 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 rounded-lg flex items-center justify-center font-bold transition shadow-sm border border-cyan-100" title="저장 목록 보기">
-                                <i data-lucide="folder-open" class="w-4 h-4 mr-1.5"></i> <span class="text-sm">목록</span>
-                            </button>
-                            <button onclick="promptClearNotepad()" class="px-4 py-2 w-24 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg flex items-center justify-center font-bold transition shadow-sm border border-rose-100" title="전체 지우기">
-                                <i data-lucide="trash-2" class="w-4 h-4 mr-1.5"></i> <span class="text-sm">지우기</span>
-                            </button>
-                        </div>
                     </div>
                 </div>
-                <div id="notepad-editor" style="font-size: 32px;" class="flex-1 p-8 text-slate-800 overflow-y-auto w-full h-full outline-none relative"></div>
-                
+
+
                 <!-- 이미지 편집 플로팅 툴바 -->
                 <div id="image-action-toolbar" class="hidden absolute bg-white p-2 rounded-2xl shadow-xl border border-slate-200 z-[110] flex items-center gap-1 animate-pop-in">
                     <span class="text-xs font-bold text-slate-400 mx-1">사진</span>
@@ -270,7 +240,70 @@
                     <div class="w-px h-4 bg-slate-200 mx-1"></div>
                     <button onclick="boardEditor.deleteImage()" class="p-2.5 bg-rose-50 hover:bg-rose-100 rounded-xl text-rose-600 transition" title="사진 삭제"><i data-lucide="trash-2" class="w-5 h-5 pointer-events-none"></i></button>
                     <button onclick="boardEditor.deselect()" class="p-2.5 text-slate-400 hover:bg-slate-100 rounded-xl transition" title="닫기"><i data-lucide="x" class="w-5 h-5 pointer-events-none"></i></button>
-                </div><div id="btn-tool-activity" class="absolute bottom-8 left-8 flex flex-col-reverse items-start gap-3 z-[150]">
+                </div>
+            </section>
+
+            <!-- 오른쪽: 오늘 위젯 (넓은 화면에서만 보임) -->
+            <aside id="sb-widgets" class="sb-widgets" aria-label="오늘 위젯">
+                <section id="sb-lunch-widget" class="sb-card sb-widget panel-bg" aria-label="오늘 급식">
+                    <div class="sb-w-head">
+                        <span class="sb-w-icon sb-tone-green" aria-hidden="true"><i data-lucide="utensils" class="w-5 h-5"></i></span>
+                        <h2 id="sb-lunch-title">오늘 급식</h2>
+                        <button type="button" class="sb-w-more" onclick="openLunchModal()">자세히</button>
+                    </div>
+                    <div id="sb-lunch-body" class="sb-w-body"><p class="sb-w-empty">급식을 불러오는 중…</p></div>
+                </section>
+                <section id="sb-events-widget" class="sb-card sb-widget panel-bg" aria-label="학사일정">
+                    <div class="sb-w-head">
+                        <span class="sb-w-icon sb-tone-rose" aria-hidden="true"><i data-lucide="calendar-days" class="w-5 h-5"></i></span>
+                        <h2>학사일정</h2>
+                        <button type="button" class="sb-w-more" onclick="openCalendar()">달력</button>
+                    </div>
+                    <div id="sb-events-body" class="sb-w-body"><p class="sb-w-empty">일정을 불러오는 중…</p></div>
+                </section>
+            </aside>
+        </div>
+
+        <!-- Dock: 도구 버튼 (macOS Dock 처럼 아래쪽 유리 막대, 손을 올리면 커짐 · 열려 있는 도구는 아래 점) -->
+        <nav id="sb-dock" class="sb-dock" aria-label="도구 모음">
+            <div id="sb-dock-inner" class="sb-dock-inner">
+                <div id="toolbar-tools" class="sb-dock-tools">
+                    <button id="btn-tool-picker" type="button" onclick="pickRandomNumber()" class="sb-dock-item"><span class="sb-tile sb-tone-plum"><i data-lucide="dices"></i></span><span class="sb-dock-label">뽑기</span><span class="sb-run" aria-hidden="true"></span></button>
+                    <button id="btn-tool-timer" type="button" onclick="toggleTimerPopup()" class="sb-dock-item"><span class="sb-tile sb-tone-orange"><i data-lucide="timer"></i></span><span class="sb-dock-label">타이머</span><span class="sb-run" aria-hidden="true"></span></button>
+                    <button id="btn-tool-noise" type="button" onclick="toggleNoiseMeter()" class="sb-dock-item"><span class="sb-tile sb-tone-teal"><i data-lucide="audio-lines"></i></span><span class="sb-dock-label">소음 측정</span><span class="sb-run" aria-hidden="true"></span></button>
+                    <button id="btn-tool-attention" type="button" onclick="playAttentionBell()" class="sb-dock-item"><span class="sb-tile sb-tone-amber"><i data-lucide="megaphone"></i></span><span class="sb-dock-label">주목!</span><span class="sb-run" aria-hidden="true"></span></button>
+                    <button id="btn-tool-youtube" type="button" onclick="openYouTube()" class="sb-dock-item"><span class="sb-tile sb-tone-red"><i data-lucide="youtube"></i></span><span class="sb-dock-label">유튜브</span><span class="sb-run" aria-hidden="true"></span></button>
+                    <button id="btn-tool-tinkerbell" type="button" onclick="openExternalSite('tinkerbell')" class="sb-dock-item" title="팅커벨 (tkbell.co.kr)"><span class="sb-tile sb-tone-violet"><i data-lucide="sparkles"></i></span><span class="sb-dock-label">팅커벨</span><span class="sb-run" aria-hidden="true"></span></button>
+                    <button id="btn-tool-iscream" type="button" onclick="openExternalSite('iscream')" class="sb-dock-item" title="아이스크림 (i-scream.co.kr)"><span class="sb-tile sb-tone-pink"><i data-lucide="ice-cream-cone"></i></span><span class="sb-dock-label">아이스크림</span><span class="sb-run" aria-hidden="true"></span></button>
+                    <button id="btn-tool-lunch" type="button" onclick="openLunchModal()" class="sb-dock-item"><span class="sb-tile sb-tone-green"><i data-lucide="utensils"></i></span><span class="sb-dock-label">급식</span><span class="sb-run" aria-hidden="true"></span></button>
+                    <button id="btn-tool-popupnote" type="button" onclick="togglePopupNote()" class="sb-dock-item"><span class="sb-tile sb-tone-gold"><i data-lucide="sticky-note"></i></span><span class="sb-dock-label">팝업 노트</span><span class="sb-run" aria-hidden="true"></span></button>
+                    <button id="btn-tool-qr" type="button" onclick="window.qr.open()" class="sb-dock-item" title="링크를 QR 코드로"><span class="sb-tile sb-tone-slate"><i data-lucide="qr-code"></i></span><span class="sb-dock-label">QR</span><span class="sb-run" aria-hidden="true"></span></button>
+                </div>
+                <span class="sb-dock-sep" aria-hidden="true"></span>
+                <button id="btn-dock-overview" type="button" onclick="window.shell.toggleOverview(true)" class="sb-dock-item" title="모든 도구 (활동 개요)"><span class="sb-tile sb-tone-glass"><i data-lucide="layout-grid"></i></span><span class="sb-dock-label">모든 도구</span><span class="sb-run" aria-hidden="true"></span></button>
+                <button type="button" onclick="openToolSettings()" class="sb-dock-item" title="도구 상세 설정"><span class="sb-tile sb-tone-glass"><i data-lucide="settings-2"></i></span><span class="sb-dock-label">도구 설정</span><span class="sb-run" aria-hidden="true"></span></button>
+            </div>
+        </nav>
+        <button id="sb-dock-peek" type="button" class="sb-dock-peek" onclick="window.shell.peekDock()" aria-expanded="false"><i data-lucide="chevron-up" class="w-4 h-4"></i><span>도구 모음</span></button>
+    </div>
+
+    <!-- 활동 개요 (Ubuntu 의 '활동' 화면처럼 열린 화면 + 모든 도구 + 검색) -->
+    <div id="sb-overview" class="sb-overview" role="dialog" aria-modal="true" aria-label="활동 개요 — 모든 도구" hidden>
+        <div class="sb-ov-content">
+            <div class="sb-ov-search">
+                <label for="sb-ov-input" class="sr-only">도구 검색</label>
+                <i data-lucide="search" class="w-5 h-5"></i>
+                <input id="sb-ov-input" type="search" placeholder="도구·설정·기록 찾기 — 예: 타이머, 급식, 백업" autocomplete="off" spellcheck="false">
+            </div>
+            <div id="sb-ov-windows" class="sb-ov-windows" aria-label="열린 화면"></div>
+            <div id="sb-ov-grid" class="sb-ov-grid" aria-label="모든 도구"></div>
+            <p id="sb-ov-empty" class="sb-ov-empty" hidden></p>
+            <p class="sb-ov-hint">빈 곳을 누르거나 Esc 키를 누르면 돌아가요 · 검색 후 Enter 를 누르면 첫 번째 도구가 열려요</p>
+        </div>
+    </div>
+
+    <!-- 학습 약속 (떠 있는 위젯) -->
+    <div id="btn-tool-activity" class="absolute bottom-[12rem] left-[28.5rem] flex flex-col-reverse items-start gap-3 z-[100]">
     <div id="activity-indicator" onclick="toggleActivityMenu()" class="cursor-pointer bg-white/95 backdrop-blur-sm border border-slate-200 px-5 py-3.5 rounded-3xl shadow-2xl flex items-center gap-4 animate-pop-in hover:scale-105 transition-transform w-64">
         <div id="activity-icon-bg" class="p-3 rounded-2xl bg-slate-800 text-white">
             <i id="activity-icon" data-lucide="volume-x" class="w-10 h-10"></i>
@@ -300,9 +333,9 @@
         </button>
     </div>
 </div>
-            
+
             <!-- POPUP NOTE -->
-            <div id="floating-popup-note" class="hidden absolute bottom-6 right-6 w-[22.5rem] h-[28.125rem] bg-amber-50 rounded-3xl shadow-2xl flex-col border border-amber-300 z-[100] overflow-hidden animate-pop-in">
+            <div id="floating-popup-note" class="hidden absolute bottom-28 right-6 w-[22.5rem] h-[28.125rem] bg-amber-50 rounded-3xl shadow-2xl flex-col border border-amber-300 z-[100] overflow-hidden animate-pop-in">
                 <div class="bg-amber-200 px-5 py-4 flex justify-between items-center shrink-0">
                     <h3 class="font-bold text-amber-800 flex items-center text-lg">
                         <i data-lucide="sticky-note" class="mr-2 w-5 h-5"></i> 팝업 노트
@@ -334,7 +367,7 @@
             </div>
 
             <!-- FLOATING TIMER -->
-       <div id="floating-timer" class="hidden absolute bottom-6 right-[48.5rem] w-[21.25rem] bg-white rounded-3xl shadow-2xl flex-col border border-blue-200 z-[100] overflow-hidden animate-pop-in">
+       <div id="floating-timer" class="hidden absolute bottom-28 right-[48.5rem] w-[21.25rem] bg-white rounded-3xl shadow-2xl flex-col border border-blue-200 z-[100] overflow-hidden animate-pop-in">
                 <div class="bg-blue-50 px-5 py-4 flex justify-between items-center shrink-0 border-b border-blue-100">
                     <h3 class="font-bold text-blue-800 flex items-center text-lg">
                         <i data-lucide="timer" class="mr-2 w-5 h-5"></i> 타이머
@@ -369,7 +402,7 @@
             </div>
 
             <!-- FLOATING NOISE METER (소음 측정기) -->
-<div id="floating-noise-meter" class="hidden absolute bottom-6 right-[25rem] w-[22.5rem] bg-white rounded-3xl shadow-2xl flex-col border border-emerald-200 z-[100] overflow-hidden animate-pop-in"> 
+<div id="floating-noise-meter" class="hidden absolute bottom-28 right-[25rem] w-[22.5rem] bg-white rounded-3xl shadow-2xl flex-col border border-emerald-200 z-[100] overflow-hidden animate-pop-in"> 
 <div class="bg-emerald-50 px-5 py-3 flex justify-between items-center shrink-0 border-b border-emerald-100">
         <h3 class="font-bold text-emerald-800 flex items-center text-lg">
             <i data-lucide="ear" class="mr-2 w-5 h-5"></i> 소음 측정기
@@ -557,7 +590,7 @@
                     </div>
 
                     <!-- 데이터 백업·복원 (2.7.0, src/backup.ts) -->
-                    <div class="border-t border-slate-200 pt-6">
+                    <div id="settings-backup" class="border-t border-slate-200 pt-6">
                         <h3 class="font-bold text-slate-800 text-lg flex items-center mb-2">
                             <i data-lucide="archive" class="mr-2 text-brand-500"></i> 데이터 백업·복원
                         </h3>
@@ -621,8 +654,8 @@
 
                     <div class="border-t border-slate-200 pt-5">
                         <h3 class="text-lg font-bold text-slate-800 mb-1">업데이트</h3>
-                        <p class="text-xs text-slate-500 mb-2">새 버전 정보 파일(latest.json)의 주소입니다. 비워 두면 기본 주소(깃허브 doguri25/smartboard-v2 릴리스)를 씁니다.</p>
-                        <input type="text" id="setting-update-url" placeholder="기본: https://github.com/doguri25/smartboard-v2/releases/latest/download/latest.json" class="w-full p-2 rounded-xl border border-slate-300 font-bold outline-none focus:ring-2 focus:ring-brand-500 text-sm mb-2">
+                        <p class="text-xs text-slate-500 mb-2">새 버전 정보 파일(latest.json)의 주소입니다. 비워 두면 기본 주소(깃허브 doguri25/haruieum 릴리스)를 씁니다.</p>
+                        <input type="text" id="setting-update-url" placeholder="기본: https://github.com/doguri25/haruieum/releases/latest/download/latest.json" class="w-full p-2 rounded-xl border border-slate-300 font-bold outline-none focus:ring-2 focus:ring-brand-500 text-sm mb-2">
                         <label class="flex items-center justify-between cursor-pointer bg-slate-50 p-3 rounded-xl border border-slate-100">
                             <span class="font-bold text-slate-700 text-sm">시작할 때 자동으로 확인</span>
                             <input type="checkbox" id="toggle-auto-update" class="sr-only peer" checked>
@@ -633,12 +666,13 @@
                     <div class="border-t border-slate-200 pt-5">
                         <h3 class="text-lg font-bold text-slate-800 mb-1">디자인 테마</h3>
                         <p class="text-xs text-slate-500 mb-3">화면 전체의 분위기(바탕·판·글자색·모서리)를 바꿉니다. 아래 색상 설정은 그 위에 덧입혀집니다.</p>
-                        <div id="skin-cards" class="grid grid-cols-5 gap-2"></div>
+                        <div id="skin-cards" class="grid grid-cols-4 gap-2"></div>
                     </div>
 
                     <div class="border-t border-slate-200 pt-5">
                         <h3 class="text-lg font-bold text-slate-800 mb-3">강조 색상</h3>
                         <div class="flex gap-2.5">
+                            <button onclick="changeTheme('ubuntu')" class="w-10 h-10 rounded-full bg-[#e95420] border-2 border-white shadow-md hover:scale-110 transition-transform" title="우분투 주황 (오로라 기본)" aria-label="우분투 주황"></button>
                             <button onclick="changeTheme('default')" class="w-10 h-10 rounded-full bg-[#4f46e5] border-2 border-white shadow-md hover:scale-110 transition-transform"></button>
                             <button onclick="changeTheme('green')" class="w-10 h-10 rounded-full bg-[#10b981] border-2 border-white shadow-md hover:scale-110 transition-transform"></button>
                             <button onclick="changeTheme('orange')" class="w-10 h-10 rounded-full bg-[#f97316] border-2 border-white shadow-md hover:scale-110 transition-transform"></button>
@@ -938,15 +972,15 @@
                         </div>
                     </div>
                     <div class="flex items-center justify-between">
-                        <h3 class="font-bold text-slate-700 text-lg">도구 판넬 위치 (판서 위/아래)</h3>
+                        <h3 class="font-bold text-slate-700 text-lg">Dock(도구 모음) 위치</h3>
                         <div class="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200 shadow-inner">
-                            <button id="tool-pos-btn-top" onclick="setTempToolPos('top')" class="px-4 py-2 rounded-lg font-bold text-base transition bg-white shadow-sm text-brand-600">위 (기본)</button>
-                            <button id="tool-pos-btn-bottom" onclick="setTempToolPos('bottom')" class="px-4 py-2 rounded-lg font-bold text-base transition text-slate-500 hover:text-slate-700">아래</button>
+                            <button id="tool-pos-btn-top" onclick="setTempToolPos('top')" class="px-4 py-2 rounded-lg font-bold text-base transition text-slate-500 hover:text-slate-700">위</button>
+                            <button id="tool-pos-btn-bottom" onclick="setTempToolPos('bottom')" class="px-4 py-2 rounded-lg font-bold text-base transition bg-white shadow-sm text-brand-600">아래 (기본)</button>
                         </div>
                     </div>
                 </div>
                 <div class="mb-6">
-                    <h3 class="font-bold text-slate-700 text-lg mb-3">상단 도구 버튼 표시</h3>
+                    <h3 class="font-bold text-slate-700 text-lg mb-3">Dock 에 보일 도구</h3>
                     <div class="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border">
                         <label class="flex justify-between items-center cursor-pointer bg-white p-2 rounded-lg border shadow-sm"><span class="font-bold text-base">🎲 뽑기</span><input type="checkbox" id="toggle-tool-picker" class="sr-only peer"><div class="w-10 h-5 bg-slate-300 rounded-full peer-checked:bg-purple-500 after:content-[''] after:absolute after:top-[0.125rem] after:left-[0.125rem] after:bg-white after:rounded-full after:h-4 after:w-4 peer-checked:after:translate-x-[1.25rem] transition-all relative"></div></label>
                         <label class="flex justify-between items-center cursor-pointer bg-white p-2 rounded-lg border shadow-sm"><span class="font-bold text-base">⏱ 타이머</span><input type="checkbox" id="toggle-tool-timer" class="sr-only peer"><div class="w-10 h-5 bg-slate-300 rounded-full peer-checked:bg-blue-500 after:content-[''] after:absolute after:top-[0.125rem] after:left-[0.125rem] after:bg-white after:rounded-full after:h-4 after:w-4 peer-checked:after:translate-x-[1.25rem] transition-all relative"></div></label>

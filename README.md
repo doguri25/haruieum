@@ -1,8 +1,9 @@
-# 스마트 전자칠판 v2 (하루이음)
+# 하루이음 (스마트 전자칠판)
 
-기존 일렉트론 버전(v1.6.11)을 Tauri 2 + Vite + TypeScript로 옮기는 프로젝트입니다.
+교실 전자칠판용 시간표·종·판서·알림장 앱입니다. Tauri 2 + Vite + TypeScript (일렉트론 v1.6.11 에서 옮겨 옴).
+3.0.0 부터 저장소는 https://github.com/doguri25/haruieum 입니다 (2.x 까지는 doguri25/smartboard-v2).
 
-## 현재 상태: v2.8.2
+## 현재 상태: v3.0.0 — 하루이음 Aurora (새 화면)
 - 1단계: Tauri 창에서 기존 앱 실행
 - 2단계:
   - 인라인 스크립트 → `src/legacy-app.js` 로 분리 (기능 변경 없음)
@@ -173,7 +174,7 @@
     학교 선택·인증키 저장 뒤 시간표 다시 그림, 급식은 받기 시작할 때 이전 식단을 비우고 늦은 실패 응답 무시,
     한 글자 구 이름(중구·동구…)은 측정소 이름이 정확히 같을 때만, 유튜브 검색 순번으로 늦은 결과 무시
   - 떠 있는 창 (`src/floating.ts`): pointerdown 마다 '끌었음' 표시 초기화(터치), z-index 119 에서 순서대로 다시 매김
-- v2.8.2 (지금): 2차 여러 에이전트 점검(영역을 새로 나눠 5명 + 반박 검증 5명) → 확인된 19건 + 불확실 2건 수정. 회귀 검사 18개는 2.8.1 코드에서 13개 실패하는 것 확인
+- v2.8.2: 2차 여러 에이전트 점검(영역을 새로 나눠 5명 + 반박 검증 5명) → 확인된 19건 + 불확실 2건 수정. 회귀 검사 18개는 2.8.1 코드에서 13개 실패하는 것 확인
   - Rust: 메인 창이 없어지면 `app.exit(0)` (사이트 창이 남아 창 없는 앱이 계속 돌던 문제), `check_file_name` 은 점으로만 된 이름만 금지('...' 허용),
     `import_alarm_mp3` 는 같은 이름의 다른 소리면 '이름 (2).mp3', 백업·복원 명령은 `#[tauri::command(async)]`,
     `read_text_or_empty` 는 깨진 UTF-8 을 '내용 깨짐'으로(손실 변환해 돌려줌 → JS 가 사본 남기고 계속 저장)
@@ -187,6 +188,21 @@
   - 학사일정은 받기 실패 시 5분마다 재시도, 급식은 받기 순번(`loadSeq`)으로 학교가 바뀐 경우도 늦은 응답 무시
   - 주의: 시작할 때(onReady) 바로 실행되는 코드가 쓰는 `let` 변수는 startLegacyApp 위쪽에 선언해야 함 — 아래쪽에 두면 선언 전 접근 오류가
     try/catch 에 묻혀 시작이 중간에 멈춤(이번에 색 팔레트가 비는 것을 회귀 검사로 잡음)
+
+- v3.0.0 (지금): **하루이음 Aurora** — macOS 와 Ubuntu 의 좋은 점을 섞은 새 화면. 기능 코드(`src/legacy-app.js`)의 id·onclick 은 그대로 두고 화면 뼈대만 바꿈
+  - 뼈대 `index.html`, 동작 `src/shell.ts`, 모양 `src/aurora.css` (모든 테마 변수 `--sk-*`·`--brand-*` 를 써서 11개 테마 어디서나 맞게)
+  - 상단 바(Ubuntu): 왼쪽 '활동', 가운데 **지금 수업 상태**(몇 교시·몇 분 남음·진행 고리 — 시간표 칸을 읽어 계산, 휴업일·주말·쉬는 시간·수업 전·방과 후),
+    오른쪽 날씨·미세먼지, **빠른 설정**(음량·수업 종·항상 위·전체 화면·PC 켜면 실행·디자인 테마), 환경 설정
+  - 왼쪽 사이드바: 큰 시계 '지금' 카드(오전/오후는 작게) + 오늘의 시간표
+  - 판서 창: 머리줄(보관·기록 | 판서/알림장 전환 버튼 | 배경·지우기·집중 모드) + 판 아래쪽에 떠 있는 판서 도구(macOS 프리폼처럼)
+  - **Dock**(macOS): 도구를 아래쪽 유리 막대로, 손을 올리면 커지고 이웃도 살짝, 열려 있는 도구 아래 점. 도구 설정에서 위/아래 선택
+  - **활동 개요**(Ubuntu): 열린 화면(판서·알림장 미리보기, 지난 기록) + 도구·설정 22개 + 검색(Enter 로 첫 번째 실행, Esc)
+  - **집중 모드**: 판서만 크게 (사이드바·위젯·Dock 숨김, '도구 모음' 버튼으로 잠깐 꺼냄, Esc 로 나감)
+  - 오른쪽 위젯(가로 1500px 이상): 오늘 급식(우리 반 알레르기 표시, 주말이면 다음 월요일) · 2주 안 학사일정
+  - **오로라 테마**(새 기본): 해 뜨는 언덕 배경(앱에 내장된 SVG), 유리 판, 우분투 주황(#E95420)·가지색. 글꼴 Ubuntu(숫자·영문, `@fontsource/ubuntu`) + 나눔고딕
+  - 3.0 으로 처음 켤 때 한 번(`sb.v3.aurora`): 오로라 테마·우분투 주황·Dock 아래로 바꾸고 바탕색·판 색 지정은 테마 기본으로 (다시 고를 수 있음). 시간표·판서·기록은 그대로
+  - 기능 코드에 추가: `getBoardMode/setBoardMode`, `isBellEnabled/setBellEnabled`, 도구 위치는 `.sb-dock-top`
+  - 검사: 기존 브라우저 회귀 검사 전부 + 새 화면 49개 + 위젯 9개(NEIS 가짜 응답) + 실제 앱(tauri-driver)
 
 ## 개발 PC 준비 (macOS, 한 번만)
 ```bash
@@ -202,7 +218,7 @@ npm run tauri dev
 ```
 
 ## 자동 업데이트 운영 (깃허브 릴리스)
-저장소: https://github.com/doguri25/smartboard-v2 (공개 — 앱이 로그인 없이 latest.json 을 받아야 함)
+저장소: https://github.com/doguri25/haruieum (공개 — 앱이 로그인 없이 latest.json 을 받아야 함. 2.x 는 doguri25/smartboard-v2)
 
 준비 (한 번만): 저장소 Settings → Secrets and variables → Actions → New repository secret →
 이름 `TAURI_SIGNING_PRIVATE_KEY`, 값은 `src-tauri/updater.key` 파일 내용 전체. (키 파일은 절대 저장소에 올리지 말 것 — .gitignore 에 제외돼 있음)
@@ -237,10 +253,10 @@ setup.exe · .sig · latest.json 세 파일을 해당 버전 릴리스에 올리
    git add .
    git commit -m "v2 2단계: Tauri 이전, 코드 분리, 반응형 배율"
    ```
-2. github.com → New repository → 이름 `smartboard-v2` (Private 추천) → Create
+2. github.com → New repository → 이름 `haruieum` (자동 업데이트를 쓰려면 Public) → Create
 3. 화면에 나오는 안내대로:
    ```bash
-   git remote add origin https://github.com/<내계정>/smartboard-v2.git
+   git remote add origin https://github.com/<내계정>/haruieum.git
    git branch -M main
    git push -u origin main
    ```

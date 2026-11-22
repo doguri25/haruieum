@@ -13,7 +13,7 @@ import { isTauri, storage } from "./storage";
 interface UpdateInfo { version: string; current: string; notes?: string | null; date?: string | null }
 
 const el = (id: string) => document.getElementById(id);
-export const DEFAULT_UPDATE_URL = "https://github.com/doguri25/smartboard-v2/releases/latest/download/latest.json";
+export const DEFAULT_UPDATE_URL = "https://github.com/doguri25/haruieum/releases/latest/download/latest.json";
 export const getUpdateUrl = () => (storage.getItem("smartBoardUpdateUrl") || "").trim() || DEFAULT_UPDATE_URL;
 export const isAutoUpdate = () => storage.getItem("smartBoardAutoUpdate") !== "false";
 

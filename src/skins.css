@@ -295,7 +295,7 @@
   --sk-header-chip-text: #27272d;
   --sk-header-gear-bg: #18181b;
 }
-[data-skin="mono"] #toolbar-tools > button { background-image: none !important; background-color: rgb(var(--sk-ink)) !important; border-color: transparent; }
+[data-skin="mono"] .sb-tile:not(.sb-tone-glass) { background: rgb(var(--sk-ink)) !important; }
 
 /* ---------- 라벤더: 연보라, 은은한 그라데이션 ---------- */
 [data-skin="lavender"] {
@@ -433,8 +433,8 @@ h1, h2, h3 { font-family: var(--sk-font-heading); }
 select option { color: #1e293b; background: #ffffff; }
 input[type="range"] { background: transparent; }
 
-/* 도구 버튼(그라데이션) 채도 */
-#toolbar-tools button { filter: saturate(var(--sk-saturate)); }
+/* 도구 아이콘 채도 */
+.sb-tile { filter: saturate(var(--sk-saturate)); }
 
 /* 칠판 테마: 판 테두리를 조금 두껍게 */
 [data-skin="chalk"] .panel-bg { border-width: 2px; }

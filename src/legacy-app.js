@@ -72,7 +72,8 @@ export function startLegacyApp() {
         let globalVolume = storage.getItem('smartBoardVolume') !== null ? parseFloat(storage.getItem('smartBoardVolume')) : 0.5; let maxPickerNum = 25; try { if(storage.getItem('smartBoardMaxPicker')) maxPickerNum = parseInt(storage.getItem('smartBoardMaxPicker')); } catch(e){}
         let timetablePos = storage.getItem('smartBoardTimetablePos') || 'left';
         let tempTimetablePos = timetablePos;
-        let toolPanelPos = storage.getItem('smartBoardToolPos') || 'top';
+        // 3.0.0: 도구는 아래쪽 Dock 이 기본 ('top' 이면 상단 바 아래)
+        let toolPanelPos = storage.getItem('smartBoardToolPos') || 'bottom';
         let tempToolPanelPos = toolPanelPos;
         
         let timerRemaining = 0; let isTimerRunning = false;
@@ -649,8 +650,10 @@ export function startLegacyApp() {
         function toggleAlwaysOnTop() {
             isAlwaysOnTop = !isAlwaysOnTop;
             const btn = document.getElementById('btn-always-on-top');
-            if (isAlwaysOnTop) { btn.classList.add('bg-white', 'text-brand-600'); btn.classList.remove('text-slate-600'); }
-            else { btn.classList.remove('bg-white', 'text-brand-600'); btn.classList.add('text-slate-600'); }
+            // 3.0.0: 빠른 설정의 '항상 위' 칸 (켜짐·꺼짐 표시는 aria-pressed)
+            if (btn) btn.setAttribute('aria-pressed', String(isAlwaysOnTop));
+            const st = document.getElementById('qs-pin-state'); if (st) st.textContent = isAlwaysOnTop ? '켜짐' : '꺼짐';
+            document.body.classList.toggle('sb-pinned', isAlwaysOnTop);
             // main.ts가 window.smartboardHost에 Tauri 창 API를 노출함
             const host = window.smartboardHost;
             if (host && host.setAlwaysOnTop) {
@@ -681,7 +684,14 @@ export function startLegacyApp() {
         
         function updateClock() { 
             const now = new Date(); 
-            document.getElementById('current-time-text').innerText = now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: !use24HourClock }); 
+            // 3.0.0: '오전/오후'는 작게 (큰 시계 카드에 들어가게)
+            const timeStr = now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: !use24HourClock });
+            const timeEl = document.getElementById('current-time-text');
+            if (timeEl && timeEl.dataset.t !== timeStr) {
+                timeEl.dataset.t = timeStr;
+                const mer = timeStr.match(/^(오전|오후)\s*(.*)$/);
+                if (mer) timeEl.innerHTML = `<span class="sb-meridiem">${mer[1]}</span>${mer[2]}`; else timeEl.textContent = timeStr;
+            }
             const days = ['일', '월', '화', '수', '목', '금', '토']; 
             document.getElementById('current-date-text').innerText = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 (${days[now.getDay()]}요일)`; 
             updateTimetableHighlight(now); 
@@ -1245,8 +1255,9 @@ export function startLegacyApp() {
         function applyToolPos() {
             const container = document.getElementById('right-layout-container');
             if (container) {
-                if (toolPanelPos === 'bottom') { container.classList.add('flex-col-reverse'); } 
-                else { container.classList.remove('flex-col-reverse'); }
+                // 3.0.0: #right-layout-container = [본문, Dock]. 'top' 이면 Dock 을 위로 (예전 '도구 판넬 위' 와 같은 뜻)
+                container.classList.toggle('sb-dock-top', toolPanelPos === 'top');
+                container.classList.remove('flex-col-reverse');
             }
         }
 
@@ -1426,6 +1437,17 @@ function currentEditorKey() {
 }
 
 let boardSwitching = false;
+/** 3.0.0: 지금 보이는 판 ('board' 판서 / 'notice' 알림장) — 상단 전환 버튼이 씀 */
+function getBoardMode() { return currentBoardMode; }
+/** 3.0.0: 전환 중이면 false (전환 효과가 끝난 뒤 다시 눌러야 함) */
+function setBoardMode(mode) { if (mode === currentBoardMode) return true; if (boardSwitching) return false; toggleBoardMode(); return true; }
+/** 3.0.0: 빠른 설정의 '수업 종' = 교시 알람 팝업·종 (교시 알람 설정의 같은 스위치와 같은 값) */
+function isBellEnabled() { return isAlarmPopupEnabled; }
+function setBellEnabled(on) {
+    isAlarmPopupEnabled = !!on;
+    storage.setItem('smartBoardAlarmPopupEnabled', isAlarmPopupEnabled);
+    const t = document.getElementById('toggle-alarm-popup'); if (t) t.checked = isAlarmPopupEnabled;
+}
 function toggleBoardMode() {
     if (boardSwitching) return;
     const titleText = document.getElementById('board-mode-text');
@@ -1781,6 +1803,10 @@ Object.assign(window, {
     updateTimerDisplay,
     pickRandomNumber,
     toggleBoardMode,
+    getBoardMode,
+    setBoardMode,
+    isBellEnabled,
+    setBellEnabled,
     updateTimetableHighlight,
     checkAlarms,
     showAlarm,

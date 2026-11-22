@@ -122,6 +122,19 @@ export function eventsOn(d: Date): SchoolEvent[] {
   return cache().months[key.slice(0, 6)]?.events.filter((e) => e.date === key) ?? [];
 }
 
+/** 3.0.0: 오른쪽 '학사일정' 위젯 — 오늘부터 days 일 안의 일정 (다음 달 일정이 저장돼 있지 않으면 받아 봄). 학교를 안 정했으면 null */
+export async function upcomingEvents(days = 14): Promise<SchoolEvent[] | null> {
+  if (!getSchool()) return null;
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
+  if (end.getMonth() !== now.getMonth() && !cache().months[monthKey(end.getFullYear(), end.getMonth())]) {
+    try { await loadMonth(end.getFullYear(), end.getMonth()); } catch { /* 저장된 것만으로 */ }
+  }
+  const out: SchoolEvent[] = [];
+  for (let i = 0; i <= days; i++) out.push(...eventsOn(new Date(now.getFullYear(), now.getMonth(), now.getDate() + i)));
+  return out;
+}
+
 /** 그날이 휴업일·공휴일이면 일정 이름, 아니면 null. '오늘은 종 울리기'를 누른 날은 null */
 export function holidayOn(d: Date): string | null {
   if (storage.getItem(OVERRIDE_KEY) === ymd(d)) return null;
@@ -197,8 +210,8 @@ declare global {
   interface Window {
     schoolCalendar: {
       refreshToday: (force?: boolean) => Promise<void>; holidayOn: (d: Date) => string | null; ringToday: () => void;
-      renderMonth: (d: Date) => void; eventsOn: (d: Date) => SchoolEvent[];
+      renderMonth: (d: Date) => void; eventsOn: (d: Date) => SchoolEvent[]; upcomingEvents: (days?: number) => Promise<SchoolEvent[] | null>;
     }
   }
 }
-window.schoolCalendar = { refreshToday, holidayOn, ringToday, renderMonth, eventsOn };
+window.schoolCalendar = { refreshToday, holidayOn, ringToday, renderMonth, eventsOn, upcomingEvents };

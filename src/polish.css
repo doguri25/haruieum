@@ -32,14 +32,7 @@ header #header-weather-text, header #header-dust-text { color: inherit; }
 }
 [data-skin="dark"] .panel-bg { box-shadow: var(--sk-shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.05); }
 
-/* ---- 도구 버튼: 안쪽 하이라이트 + 부드러운 그림자, 누르면 가라앉음 ---- */
-#toolbar-tools > button {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -1px 0 rgba(0, 0, 0, 0.12), 0 6px 14px -8px rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.15);
-}
-#toolbar-tools > button:hover { filter: saturate(var(--sk-saturate)) brightness(1.07); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 12px 22px -10px rgba(0, 0, 0, 0.5); }
-#toolbar-tools > button:active { filter: saturate(var(--sk-saturate)) brightness(0.96); box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.25); translate: 0 0; }
+/* (3.0.0: 예전 가로 도구 버튼 꾸밈은 Dock(src/aurora.css)으로 바뀜) */
 
 /* ---- 시간표 칸 ---- */
 .timetable-slot {

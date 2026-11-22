@@ -6,6 +6,7 @@ import { storage } from "./storage";
 export interface Skin { id: string; name: string; desc: string; brand: string; preview: { page: string; surface: string; accent: string; text: string } }
 
 export const SKINS: Skin[] = [
+  { id: "aurora", name: "오로라",     desc: "유리 판과 해 뜨는 언덕 (3.0 기본)", brand: "ubuntu", preview: { page: "#f7e6dc", surface: "#ffffff", accent: "#e95420", text: "#2a1027" } },
   { id: "light",  name: "밝은 기본",  desc: "깔끔한 흰 바탕",        brand: "default", preview: { page: "#f1f5f9", surface: "#ffffff", accent: "#6366f1", text: "#1e293b" } },
   { id: "dark",   name: "다크",       desc: "어두운 교실·저녁 수업",   brand: "default", preview: { page: "#0f172a", surface: "#1e293b", accent: "#818cf8", text: "#f1f5f9" } },
   { id: "chalk",  name: "칠판",       desc: "녹색 칠판과 크림색 판",   brand: "green",   preview: { page: "#173a2e", surface: "#fbf7ec", accent: "#10b981", text: "#2a2823" } },
@@ -21,8 +22,8 @@ export const SKINS: Skin[] = [
 const KEY = "smartBoardSkin";
 
 export function currentSkin(): string {
-  const s = storage.getItem(KEY) || "light";
-  return SKINS.some((k) => k.id === s) ? s : "light";
+  const s = storage.getItem(KEY) || "aurora";
+  return SKINS.some((k) => k.id === s) ? s : "aurora";
 }
 
 /** 스킨을 적용. 바탕색·판넬색 사용자 지정은 스킨 기본값으로 되돌리고 강조색은 스킨 추천값으로 */
@@ -53,6 +54,19 @@ export function renderSkinCards() {
       <div class="swatch" style="background:${k.preview.page}"><span style="background:${k.preview.surface}"></span><span style="background:${k.preview.accent}"></span><span style="background:${k.preview.surface}"></span></div>
       <div class="name">${k.name}</div>
     </button>`).join("");
+}
+
+/** 3.0.0 으로 처음 실행할 때 한 번: 새 디자인(오로라 테마 + 우분투 주황 + 아래쪽 Dock)으로 바꿈.
+ *  예전에 고른 바탕색·판 색은 유리 판과 어울리지 않아 테마 기본값으로 되돌림 (환경 설정에서 다시 고를 수 있음)
+ *  기능 코드가 이 값들을 읽기 전에 불러야 함 */
+export function migrateToV3() {
+  if (storage.getItem("sb.v3.aurora")) return;
+  storage.setItem(KEY, "aurora");
+  storage.setItem("smartBoardTheme", "ubuntu");
+  storage.setItem("smartBoardBgColor", "skin");
+  storage.setItem("smartBoardPanelColor", "skin");
+  storage.setItem("smartBoardToolPos", "bottom");
+  storage.setItem("sb.v3.aurora", "1");
 }
 
 export function initSkins() {

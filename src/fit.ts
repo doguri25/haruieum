@@ -48,6 +48,7 @@ export function fitToWidth(el: HTMLElement, opts: FitOptions = {}) {
 }
 
 export function initFit() {
-  const tools = document.getElementById("toolbar-tools");
-  if (tools) fitToWidth(tools, { min: 0.3, max: 1.25 });
+  // 3.0.0: 도구는 아래쪽 Dock. 창이 좁아 다 들어가지 않을 때만 줄임 (키우지는 않음 — rem 이 이미 화면에 맞춰 커짐)
+  const dock = document.getElementById("sb-dock-inner");
+  if (dock) fitToWidth(dock, { min: 0.45, max: 1 });
 }

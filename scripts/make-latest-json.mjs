@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // 자동 업데이트용 latest.json 만들기
 //   node scripts/make-latest-json.mjs <설치파일이 올라갈 폴더 주소>
-//   예) node scripts/make-latest-json.mjs https://github.com/내계정/smartboard-v2/releases/latest/download
+//   예) node scripts/make-latest-json.mjs https://github.com/내계정/haruieum/releases/latest/download
 // 빌드 결과(setup.exe 와 .sig)와 src/changelog.json 을 읽어 latest.json 을 만듭니다.
 import fs from "node:fs";
 import path from "node:path";
-const base = (process.argv[2] || "https://github.com/doguri25/smartboard-v2/releases/latest/download").replace(/\/$/, "");
+const base = (process.argv[2] || "https://github.com/doguri25/haruieum/releases/latest/download").replace(/\/$/, "");
 const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
 const log = JSON.parse(fs.readFileSync("src/changelog.json", "utf8"));
 const entry = log.find((e) => e.version === pkg.version) || log[0];

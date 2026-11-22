@@ -47,7 +47,7 @@ export function toggleAllergen(n: number) {
 export function clearAllergens() { setAllergens([]); renderAllergyChips(); void renderMenu(); }
 
 // ---------- 식단 ----------
-interface Dish { name: string; codes: number[] }
+export interface Dish { name: string; codes: number[] }
 /** "미역국(5.6.9.)" → { name: "미역국", codes: [5,6,9] }  (숫자 뒤 마침표·별표 허용) */
 export function parseDish(raw: string): Dish {
   const codes: number[] = [];
@@ -58,7 +58,7 @@ export function parseDish(raw: string): Dish {
   return { name, codes };
 }
 
-interface Meal { date: Date; dishes: Dish[]; cal: string }
+export interface Meal { date: Date; dishes: Dish[]; cal: string }
 /** 보고 있는 날짜(하루 보기) 또는 그 주(이번 주 보기) */
 let viewDate = new Date();
 let weekMode = false;
@@ -192,6 +192,29 @@ async function load() {
   }
 }
 
+// ---------- 3.0.0: 오른쪽 '오늘 급식' 위젯 ----------
+export type WidgetMeal =
+  | { status: "no-school" }
+  | { status: "ok"; label: string; dishes: Dish[]; cal: string; allergens: number[] }
+  | { status: "none"; label: string };
+let widgetCache: { key: string; meal: Meal | null } | null = null;
+/** 오늘(주말이면 다음 월요일) 급식. 같은 학교·같은 날은 한 번만 받음 */
+export async function widgetMeal(force = false): Promise<WidgetMeal> {
+  const school = getSchool();
+  if (!school) return { status: "no-school" };
+  const d = skipWeekend(dayOnly(new Date()), 1);
+  const key = `${school.officeCode}:${school.code}:${ymd(d)}`;
+  if (force || !widgetCache || widgetCache.key !== key) {
+    const rows = await neisRows("mealServiceDietInfo", { ATPT_OFCDC_SC_CODE: school.officeCode, SD_SCHUL_CODE: school.code, MLSV_YMD: ymd(d) });
+    widgetCache = { key, meal: rows.length ? rowToMeal(pickLunch(rows)) : null };
+  }
+  const rel = relLabel(d);
+  const label = rel ? `${rel} 급식` : `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAYS[d.getDay()]}) 급식`;
+  const m = widgetCache.meal;
+  if (!m || !m.dishes.length) return { status: "none", label };
+  return { status: "ok", label, dishes: m.dishes, cal: m.cal, allergens: getAllergens() };
+}
+
 /** 급식 창을 열 때: 오늘(주말이면 다음 월요일)부터 */
 export async function fetchLunch() {
   viewDate = skipWeekend(dayOnly(new Date()), 1);
@@ -245,8 +268,8 @@ declare global {
     lunch: {
       fetch: () => Promise<void>; search: () => Promise<void>; toggleAllergyPanel: (s?: boolean) => void; toggleAllergen: (n: number) => void;
       clearAllergens: () => void; hasSchool: () => boolean; move: (d: 1 | -1) => void; goToday: () => void; setWeek: (on: boolean) => void;
-      fillNeisKey: () => void; saveNeisKey: () => void;
+      fillNeisKey: () => void; saveNeisKey: () => void; widgetMeal: (force?: boolean) => Promise<WidgetMeal>;
     }
   }
 }
-window.lunch = { fetch: fetchLunch, search: searchSchool, toggleAllergyPanel, toggleAllergen, clearAllergens, hasSchool: () => !!getSchool(), move, goToday, setWeek, fillNeisKey, saveNeisKey };
+window.lunch = { fetch: fetchLunch, search: searchSchool, toggleAllergyPanel, toggleAllergen, clearAllergens, hasSchool: () => !!getSchool(), move, goToday, setWeek, fillNeisKey, saveNeisKey, widgetMeal };

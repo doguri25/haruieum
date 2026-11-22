@@ -15,7 +15,8 @@ import { startLegacyApp } from "./legacy-app";
 import { initFloatingPanels } from "./floating";
 import { initFit } from "./fit";
 import { initMotion } from "./motion";
-import { initSkins } from "./skins";
+import { initSkins, migrateToV3 } from "./skins";
+import { initShell } from "./shell";
 import { initUpdater } from "./updater";
 import { renderVersionModal } from "./version";
 import "./board-editor"; // window.boardEditor (legacy-app.js 와 HTML 버튼이 사용)
@@ -35,6 +36,11 @@ import "@fontsource/nanum-myeongjo";
 import "@fontsource/nanum-myeongjo/700.css";
 import "@fontsource/poor-story";
 import "@fontsource/gamja-flower";
+import "@fontsource/nanum-gothic/800.css";
+import "@fontsource/ubuntu/300.css";
+import "@fontsource/ubuntu/400.css";
+import "@fontsource/ubuntu/500.css";
+import "@fontsource/ubuntu/700.css";
 import "./tailwind.css";
 import "./responsive.css";
 import "./floating.css";
@@ -42,6 +48,7 @@ import "./board-editor.css";
 import "./skins.css";
 import "./polish.css";
 import "./motion.css";
+import "./aurora.css";
 
 // --- 아이콘 ------------------------------------------------------------
 // 최신 lucide에는 브랜드 아이콘(youtube)이 없어서 비슷한 모양으로 대체
@@ -50,7 +57,8 @@ const lucideGlobal = { createIcons: () => createIcons({ icons: iconSet }) };
 
 // --- Tauri 호스트 기능 (legacy-app.js 가 window.smartboardHost 로 사용) ----
 const smartboardHost = {
-  setAlwaysOnTop: (on: boolean) => getCurrentWindow().setAlwaysOnTop(on),
+  // 브라우저(npm run dev)에는 앱 창이 없으므로 아무것도 하지 않음 (예전엔 누를 때마다 오류)
+  setAlwaysOnTop: (on: boolean) => (isTauri() ? getCurrentWindow().setAlwaysOnTop(on) : Promise.resolve()),
   pickAlarmMp3,
   getAlarmUrl,
   getDataDir: () => (isTauri() ? invoke<string>("get_data_dir") : Promise.resolve("(브라우저: localStorage)")),
@@ -143,10 +151,13 @@ async function boot() {
   if (document.readyState === "loading") {
     await new Promise<void>((r) => document.addEventListener("DOMContentLoaded", () => r(), { once: true }));
   }
+  migrateToV3();        // 3.0.0 처음 실행: 새 디자인으로 (legacy 가 설정을 읽기 전에)
   initSkins();          // 디자인 테마 (legacy 가 바탕색을 덧입히기 전에)
   startLegacyApp();
+  // 3.0.0 새 화면: 수업 상태·빠른 설정·활동 개요·집중 모드·위젯 (문제가 생겨도 나머지 시작은 계속)
+  try { initShell(); } catch (e) { console.error("새 화면 준비 실패:", e); }
   initFloatingPanels();
-  initFit();            // 가로 도구 메뉴 너비 맞춤
+  initFit();            // Dock 너비 맞춤
   initMotion();         // 열고 닫는 효과·클릭 효과
   initUpdater();        // 자동 업데이트 확인
   void preloadAlarm(storage.getItem("smartBoardCustomMp3") || "");
