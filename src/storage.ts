@@ -11,7 +11,7 @@
 //   board        smartBoardCurrentNotepad     (판서 HTML, 사진 포함)
 //   notice       smartBoardCurrentNotice      (알림장 HTML)
 //   saved-boards smartBoardSavedData          (보관한 판서 목록)
-//   popup-note   smartBoardDraftPopupNote     (팝업 노트 초안)
+//   popup-note   smartBoardDraftPopupNote     (팝업 노트 초안), sb.widget.memo (첫 화면 메모)
 //   settings     그 밖의 전부 (시간표, 알람, 테마, 팝업 위치 ...)
 // ============================================================
 import { invoke } from "@tauri-apps/api/core";
@@ -23,6 +23,7 @@ const KEY_TO_BUCKET: Record<string, Bucket> = {
   smartBoardCurrentNotice: "notice",
   smartBoardSavedData: "saved-boards",
   smartBoardDraftPopupNote: "popup-note",
+  "sb.widget.memo": "popup-note",           // 3.1.0 첫 화면 메모 위젯 (글자 하나 칠 때 설정 파일을 다시 쓰지 않게)
 };
 const bucketOf = (key: string): Bucket => KEY_TO_BUCKET[key] ?? "settings";
 

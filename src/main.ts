@@ -17,6 +17,7 @@ import { initFit } from "./fit";
 import { initMotion } from "./motion";
 import { initSkins, migrateToV3 } from "./skins";
 import { initShell } from "./shell";
+import { initWidgets } from "./widgets";
 import { initUpdater } from "./updater";
 import { renderVersionModal } from "./version";
 import "./board-editor"; // window.boardEditor (legacy-app.js 와 HTML 버튼이 사용)
@@ -50,6 +51,7 @@ import "./skins.css";
 import "./polish.css";
 import "./motion.css";
 import "./aurora.css";
+import "./panels.css";  // 3.1.0 창(모달·떠 있는 도구 창) 모양
 
 // --- 아이콘 ------------------------------------------------------------
 // 최신 lucide에는 브랜드 아이콘(youtube)이 없어서 비슷한 모양으로 대체
@@ -157,6 +159,7 @@ async function boot() {
   startLegacyApp();
   // 3.0 새 화면: 수업 상태·빠른 설정·모든 도구 모아 보기·집중 모드·위젯 (문제가 생겨도 나머지 시작은 계속)
   try { initShell(); } catch (e) { console.error("새 화면 준비 실패:", e); }
+  try { initWidgets(); } catch (e) { console.error("첫 화면 위젯 준비 실패:", e); }
   initFloatingPanels();
   initFit();            // Dock 너비 맞춤
   initMotion();         // 열고 닫는 효과·클릭 효과

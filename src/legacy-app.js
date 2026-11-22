@@ -614,6 +614,7 @@ export function startLegacyApp() {
             if(document.getElementById('reset-note').checked) { 
                 storage.removeItem('smartBoardDraftPopupNote'); 
                 storage.removeItem('smartBoardPopupNoteVisible');
+                storage.removeItem('sb.widget.memo'); // 3.1.0: 첫 화면 메모 위젯도
                 document.getElementById('popup-note-textarea').value=''; 
             } 
             if(document.getElementById('reset-table').checked) { 
@@ -1333,19 +1334,21 @@ export function startLegacyApp() {
         // 시간을 더하면 진행 막대의 전체 시간도 같이 늘어남 (시작 전이면 남은 시간이 곧 전체 시간)
         function adjustTimerTime(s) { syncTimerRemaining(); timerRemaining += s; if (timerRemaining < 0) timerRemaining = 0; timerTotal = Math.max(timerRemaining, timerTotal + s); if (isTimerRunning) timerEndAt = Date.now() + timerRemaining * 1000; updateTimerDisplay(); }
         function addTimerTime(s) { syncTimerRemaining(); timerRemaining += s; timerTotal = Math.max(timerRemaining, timerTotal + s); if (isTimerRunning) timerEndAt = Date.now() + timerRemaining * 1000; updateTimerDisplay(); }
+        /** 3.1.0: 첫 화면 타이머 위젯이 읽는 현재 상태 */
+        function getTimerState() { syncTimerRemaining(); return { remaining: timerRemaining, total: timerTotal, running: isTimerRunning }; }
         function syncTimerRemaining() { if (isTimerRunning) timerRemaining = Math.max(0, Math.ceil((timerEndAt - Date.now()) / 1000)); }
         function toggleTimer() {
             const btn = document.getElementById('btn-timer-toggle');
             if (isTimerRunning) { 
                 timerRemaining = Math.max(0, Math.ceil((timerEndAt - Date.now()) / 1000));
-                isTimerRunning = false; btn.innerText = '계속'; 
+                isTimerRunning = false; btn.innerText = '계속'; btn.dataset.state = 'paused'; 
                 btn.classList.replace('bg-yellow-500', 'bg-blue-600'); btn.classList.replace('hover:bg-yellow-600', 'hover:bg-blue-700'); 
                 updateTimerDisplay();
             } else { 
                 if (timerRemaining <= 0) return; 
                 if (timerTotal < timerRemaining) timerTotal = timerRemaining;
                 timerEndAt = Date.now() + timerRemaining * 1000;
-                isTimerRunning = true; btn.innerText = '정지'; 
+                isTimerRunning = true; btn.innerText = '정지'; btn.dataset.state = 'running'; 
                 btn.classList.replace('bg-blue-600', 'bg-yellow-500'); btn.classList.replace('hover:bg-blue-700', 'hover:bg-yellow-600'); 
             }
         }
@@ -1365,7 +1368,7 @@ export function startLegacyApp() {
                 if (soundBusy()) timerEndPending = true; else fireTimerEnd();
             }
         }
-        function resetTimer() { isTimerRunning = false; timerEndAt = 0; timerRemaining = 0; timerTotal = 0; timerWarned = {}; updateTimerDisplay(); const btn = document.getElementById('btn-timer-toggle'); btn.innerText = '시작'; btn.classList.replace('bg-yellow-500', 'bg-blue-600'); btn.classList.replace('hover:bg-yellow-600', 'hover:bg-blue-700'); }
+        function resetTimer() { isTimerRunning = false; timerEndAt = 0; timerRemaining = 0; timerTotal = 0; timerWarned = {}; updateTimerDisplay(); const btn = document.getElementById('btn-timer-toggle'); btn.innerText = '시작'; btn.dataset.state = 'idle'; btn.classList.replace('bg-yellow-500', 'bg-blue-600'); btn.classList.replace('hover:bg-yellow-600', 'hover:bg-blue-700'); }
         function updateTimerDisplay() {
             const m = Math.floor(timerRemaining / 60); const s = timerRemaining % 60; const d = document.getElementById('timer-display'); if(d) d.innerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
             // 진행 막대: 남은 비율만큼, 절반 이하 노랑 · 20% 이하 빨강
@@ -1797,6 +1800,7 @@ Object.assign(window, {
     clearStudentNames,
     adjustTimerTime,
     addTimerTime,
+    getTimerState,
     setTimerWarn,
     toggleTimer,
     resetTimer,

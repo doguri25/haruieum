@@ -11,14 +11,12 @@
 // ============================================================
 import { storage } from "./storage";
 import { SKINS, currentSkin } from "./skins";
-import type { WidgetMeal } from "./lunch";
 
 const W = window as any;
 const $ = (id: string) => document.getElementById(id);
 const call = (name: string, ...args: unknown[]) => { const f = W[name]; if (typeof f === "function") return f(...args); console.warn(`${name} 함수가 없습니다`); };
 const icons = () => W.lucide?.createIcons();
 const esc = (v: string) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const anyModalOpen = () => !!document.querySelector(".modal.active");
 
 // ---------------------------------------------------------------- 지금 수업 상태
@@ -171,6 +169,7 @@ const TOOLS: Tool[] = [
   { key: "time", label: "시간·지정 알람", icon: "alarm-clock", tone: "orange", words: "시간 지정 알람 시계 24시간 퇴근", run: () => call("openTimeSettingsModal") },
   { key: "tools", label: "도구 설정", icon: "settings-2", tone: "graphite", words: "도구 설정 dock 숨기기 학생 명렬표 뽑기 번호 위치", run: () => call("openToolSettings") },
   { key: "backup", label: "데이터 백업", icon: "database", tone: "graphite", words: "데이터 백업 복원 저장 옮기기 새 pc", run: () => openSettingsAt("settings-backup") },
+  { key: "widgets", label: "위젯 편집", icon: "layout-panel-left", tone: "plum", words: "위젯 편집 첫 화면 오른쪽 칸 고르기 순서 메모", run: () => W.widgets?.openEditor?.() },
   { key: "theme", label: "디자인 테마", icon: "palette", tone: "orange", words: "디자인 테마 스킨 색 배경 오로라 다크 칠판", run: () => openSettingsAt("skin-cards") },
   { key: "settings", label: "환경 설정", icon: "settings", tone: "graphite", words: "환경 설정 시간표 과목 학교 업데이트", run: () => call("openSettingsModal") },
   { key: "about", label: "버전 정보", icon: "info", tone: "slate", words: "버전 정보 업데이트 만든 사람", run: () => call("showVersionInfo") },
@@ -308,67 +307,6 @@ function watchRunning(panelId: string, btnId: string, openWhen: (el: HTMLElement
   sync();
 }
 
-// ---------------------------------------------------------------- 오른쪽 위젯
-const widgetsVisible = () => { const w = $("sb-widgets"); return !!w && getComputedStyle(w).display !== "none" && !document.body.classList.contains("sb-focus"); };
-let lunchBusy = false, lunchDay = "", eventsDay = "";
-
-async function renderLunchWidget(force = false) {
-  const body = $("sb-lunch-body"), title = $("sb-lunch-title");
-  if (!body || lunchBusy || !W.lunch?.widgetMeal) return;
-  lunchBusy = true;
-  try {
-    const r: WidgetMeal = await W.lunch.widgetMeal(force);
-    lunchDay = new Date().toDateString();
-    if (r.status === "no-school") {
-      if (title) title.textContent = "오늘 급식";
-      body.innerHTML = `<p class="sb-w-empty">학교를 정하면 오늘 급식이 여기에 보여요.</p><button type="button" class="sb-w-cta" onclick="openLunchModal()">학교 정하기</button>`;
-    } else if (r.status === "none") {
-      if (title) title.textContent = r.label;
-      body.innerHTML = `<p class="sb-w-empty">등록된 급식이 없어요.</p>`;
-    } else {
-      if (title) title.textContent = r.label;
-      const mine = new Set(r.allergens);
-      body.innerHTML = `<ul class="sb-menu">${r.dishes.map((d) => {
-        const hit = d.codes.some((c) => mine.has(c));
-        return `<li class="${hit ? "is-allergy" : ""}"><span>${esc(d.name)}</span>${hit ? `<em>알레르기</em>` : ""}</li>`;
-      }).join("")}</ul>${r.cal ? `<p class="sb-w-foot">${esc(r.cal)}</p>` : ""}`;
-    }
-  } catch (e) {
-    console.warn("급식 위젯:", e);
-    body.innerHTML = `<p class="sb-w-empty">급식 정보를 가져오지 못했어요.</p><button type="button" class="sb-w-cta" data-retry="lunch">다시 시도</button>`;
-    body.querySelector("[data-retry]")?.addEventListener("click", () => void renderLunchWidget(true));
-  } finally { lunchBusy = false; }
-}
-
-const relDay = (d: Date) => {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - today.getTime()) / 86400000);
-  return diff === 0 ? "오늘" : diff === 1 ? "내일" : `${d.getMonth() + 1}/${d.getDate()} (${WEEKDAYS[d.getDay()]})`;
-};
-async function renderEventsWidget() {
-  const body = $("sb-events-body");
-  if (!body || !W.schoolCalendar?.upcomingEvents) return;
-  try {
-    const list = await W.schoolCalendar.upcomingEvents(14) as Array<{ date: string; name: string; holiday: boolean }> | null;
-    eventsDay = new Date().toDateString();
-    if (list === null) { body.innerHTML = `<p class="sb-w-empty">학교를 정하면 다가오는 일정이 보여요.</p>`; return; }
-    if (!list.length) { body.innerHTML = `<p class="sb-w-empty">2주 안에 학사일정이 없어요.</p>`; return; }
-    body.innerHTML = `<ul class="sb-events">${list.slice(0, 5).map((e) => {
-      const d = new Date(Number(e.date.slice(0, 4)), Number(e.date.slice(4, 6)) - 1, Number(e.date.slice(6, 8)));
-      return `<li><span class="sb-ev-date">${relDay(d)}</span><span class="sb-ev-name">${esc(e.name)}</span>${e.holiday ? `<em>쉬는 날</em>` : ""}</li>`;
-    }).join("")}</ul>`;
-  } catch (e) {
-    console.warn("학사일정 위젯:", e);
-    body.innerHTML = `<p class="sb-w-empty">일정을 가져오지 못했어요.</p>`;
-  }
-}
-function refreshWidgets(force = false) {
-  if (!widgetsVisible()) return;
-  const today = new Date().toDateString();
-  if (force || lunchDay !== today) void renderLunchWidget();
-  if (force || eventsDay !== today) void renderEventsWidget();
-}
-
 // ---------------------------------------------------------------- 시작
 export function initShell() {
   // 지금 수업 상태: 시간표가 다시 그려지거나 과목을 고치면 바로, 그 밖엔 2초마다
@@ -417,18 +355,6 @@ export function initShell() {
   watchRunning("floating-youtube", "btn-tool-youtube", shown);
   watchRunning("modal-lunch", "btn-tool-lunch", (el) => el.classList.contains("active"));
 
-  // 오른쪽 위젯: 시작 조금 뒤, 30분마다, 날짜가 바뀌면, 급식·설정 창을 닫으면(학교·알레르기를 바꿨을 수 있음)
-  window.setTimeout(() => refreshWidgets(true), 1500);
-  window.setInterval(() => refreshWidgets(false), 60_000);
-  window.setInterval(() => refreshWidgets(true), 30 * 60_000);
-  let wasVisible = widgetsVisible();
-  window.addEventListener("resize", () => { const v = widgetsVisible(); if (v && !wasVisible) refreshWidgets(true); wasVisible = v; });
-  for (const id of ["modal-lunch", "modal-settings"]) {
-    const m = $(id); if (!m) continue;
-    let was = m.classList.contains("active");
-    new MutationObserver(() => { const a = m.classList.contains("active"); if (was && !a) window.setTimeout(() => refreshWidgets(true), 300); was = a; })
-      .observe(m, { attributes: true, attributeFilter: ["class"] });
-  }
 }
 
 declare global {

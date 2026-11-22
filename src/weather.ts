@@ -235,7 +235,7 @@ export async function refreshWeather() {
     lastError = "no-key";
     setHeader('<i data-lucide="key-round" class="mr-2 text-amber-500 w-6 h-6"></i>', "날씨: 인증키 필요");
     const dt = el("header-dust-text"); if (dt) dt.innerText = "미세먼지: 인증키 필요";
-    renderModal(r); icons(); return;
+    renderModal(r); icons(); notify(); return;
   }
   setHeader('<i data-lucide="loader-2" class="mr-2 text-slate-400 w-6 h-6 animate-spin"></i>', "날씨 확인 중..."); icons();
   const [w, d] = await Promise.allSettled([fetchWeather(r), fetchDust(r)]);
@@ -255,8 +255,25 @@ export async function refreshWeather() {
   const dc = el("header-dust-container"), dt = el("header-dust-text");
   if (dc) dc.className = `flex items-center text-lg font-bold ${dg.color}`;
   if (dt) dt.innerText = lastDust ? `미세먼지: ${dg.text}` : "미세먼지: 정보없음";
-  renderModal(r); icons();
+  renderModal(r); icons(); notify();
 }
+// 3.1.0: 첫 화면 날씨 위젯(src/widgets.ts)이 새 값을 받아 가도록 알림
+const notify = () => document.dispatchEvent(new CustomEvent("sb:weather"));
+/** 첫 화면 날씨 위젯용 요약. 아직 불러오지 않았으면 status "loading" */
+export function weatherSnapshot() {
+  const r = getRegion();
+  if (lastError === "no-key") return { status: "no-key" as const, place: r.sigungu };
+  if (!lastWeather && lastError) return { status: "error" as const, place: r.sigungu };
+  if (!lastWeather) return { status: "loading" as const, place: r.sigungu };
+  const w = lastWeather, c = w.current, day = isDaytime(new Date().getHours());
+  const dg = worstDustGrade(lastDust?.pm10, lastDust?.pm25);
+  return {
+    status: "ok" as const, place: r.sigungu, temp: c.temp, ...describe(c.sky, c.pty, day),
+    max: w.today.max, min: w.today.min, dust: lastDust ? dg.text : null, dustRank: lastDust ? dg.rank : -1,
+    hours: w.hourly.slice(1, 5).map((h) => ({ label: h.label, temp: h.temp, ...describe(h.sky, h.pty, isDaytime(h.hour)) })),
+  };
+}
+export type WeatherSnapshot = ReturnType<typeof weatherSnapshot>;
 const isDaytime = (h: number) => h >= 6 && h < 19;
 
 function renderModal(r: Region) {
@@ -339,7 +356,7 @@ export function applyRegionPanel() {
 
 declare global {
   interface Window {
-    weather: { refresh: () => Promise<void>; renderRegionPanel: () => void; fillSigungu: (s: string) => void; applyRegionPanel: () => void };
+    weather: { refresh: () => Promise<void>; renderRegionPanel: () => void; fillSigungu: (s: string) => void; applyRegionPanel: () => void; snapshot: () => WeatherSnapshot };
   }
 }
-window.weather = { refresh: refreshWeather, renderRegionPanel, fillSigungu: (s) => fillSigungu(s), applyRegionPanel };
+window.weather = { refresh: refreshWeather, renderRegionPanel, fillSigungu: (s) => fillSigungu(s), applyRegionPanel, snapshot: weatherSnapshot };

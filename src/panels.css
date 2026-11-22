@@ -1,0 +1,193 @@
+/* ============================================================
+   3.1.0 판(창) 디자인 — 모달 창과 떠 있는 도구 창을 하루이음 모양으로
+     .sb-win     모달 창의 카드, 유튜브 창
+     .sb-tool    떠 있는 도구 창 (타이머 · 소음 측정기 · 팝업 노트)
+     .sb-dialog  알림·확인 상자 (가운데 정렬, 큰 색 타일 아이콘)
+   머리글(.sb-win-head): 색 타일 아이콘 + 굵은 제목 + 둥근 버튼, 닫기는 맨 오른쪽의 동그란 버튼
+   색은 테마 변수(skins.css 의 --sk-*, 강조색 --brand-*)를 써서 11가지 테마 모두에 맞음
+   ============================================================ */
+
+/* ---------------------------------------------------------------- 창 카드 */
+.sb-win, .sb-tool {
+  background: rgb(var(--sk-surface));
+  color: rgb(var(--sk-text-1));
+  border-radius: calc(var(--sk-r3) + 0.25rem);
+  border: 1px solid rgb(var(--sk-line));
+}
+.modal > .sb-win {
+  border-color: color-mix(in srgb, rgb(var(--sk-line)) 70%, transparent);
+  box-shadow: 0 50px 100px -32px rgba(20, 8, 24, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.28) inset;
+}
+#floating-youtube.sb-win { box-shadow: 0 40px 90px -30px rgba(20, 8, 24, 0.6); }
+
+/* ---------------------------------------------------------------- 머리글 */
+.sb-win-head {
+  flex: none; display: flex; align-items: center; gap: 0.6rem;
+  min-height: 4.1rem; padding: 0.7rem 0.8rem 0.7rem 1.05rem;
+  border-bottom: 1px solid rgb(var(--sk-line));
+  background: rgb(var(--sk-surface-2) / 0.75);
+}
+.sb-win-title {
+  flex: 1; min-width: 0; margin: 0; display: flex; align-items: center; gap: 0.7rem;
+  font-size: 1.2rem; font-weight: 800; letter-spacing: -0.01em; line-height: 1.25; color: rgb(var(--sk-text-1));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sb-win-ico, .sb-dialog-ico {
+  flex: none; display: grid; place-items: center; color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 8px 16px -9px rgba(0, 0, 0, 0.55);
+  filter: saturate(var(--sk-saturate, 1));
+}
+.sb-win-ico { width: 2.4rem; height: 2.4rem; border-radius: 0.8rem; }
+.sb-win-ico svg { width: 1.3rem; height: 1.3rem; }
+.sb-tone-brand { background: var(--brand-600); }
+[data-skin="mono"] .sb-win-ico, [data-skin="mono"] .sb-dialog-ico { background: rgb(var(--sk-ink)) !important; }
+
+.sb-win-actions { flex: none; display: flex; align-items: center; gap: 0.3rem; }
+.sb-win-btn, .sb-win-x {
+  flex: none; width: 2.75rem; height: 2.75rem; padding: 0; border: 0; border-radius: 0.9rem;
+  display: grid; place-items: center; background: transparent; color: rgb(var(--sk-text-3));
+  cursor: pointer; transition: background 0.15s, color 0.15s, transform 0.1s;
+}
+.sb-win-btn svg, .sb-win-x svg { width: 1.3rem; height: 1.3rem; }
+.sb-win-btn:hover { background: rgb(var(--sk-surface-4)); color: rgb(var(--sk-text-1)); }
+.sb-win-x { border-radius: 999px; background: rgb(var(--sk-surface-4) / 0.8); color: rgb(var(--sk-text-2)); }
+.sb-win-x:hover { background: var(--brand-600); color: #fff; }
+.sb-win-btn:active, .sb-win-x:active { transform: scale(0.94); }
+.sb-win-act {
+  display: inline-flex; align-items: center; gap: 0.4rem; min-height: 2.75rem; padding: 0 1rem;
+  border: 0; border-radius: 0.9rem; background: rgb(var(--sk-surface-4) / 0.8); color: rgb(var(--sk-text-1));
+  font: inherit; font-size: 0.92rem; font-weight: 800; white-space: nowrap; cursor: pointer; transition: background 0.15s;
+}
+.sb-win-act:hover { background: rgb(var(--sk-surface-4)); }
+.sb-win-act svg { width: 1.1rem; height: 1.1rem; }
+.sb-win-act.hidden { display: none; }
+#modal-board-viewer .sb-win-act { background: var(--brand-600); color: #fff; }
+#modal-board-viewer .sb-win-act:hover { background: var(--brand-700); }
+.sb-win-chip { flex: none; font-size: 0.85rem; font-weight: 700; color: rgb(var(--sk-text-3)); background: rgb(var(--sk-surface-4) / 0.8); padding: 0.25rem 0.75rem; border-radius: 999px; }
+.sb-win-chip:empty { display: none; }
+.sb-win-check { flex: none; display: inline-flex; align-items: center; gap: 0.45rem; min-height: 2.75rem; padding: 0 0.6rem; font-size: 0.88rem; font-weight: 700; color: rgb(var(--sk-text-2)); cursor: pointer; user-select: none; }
+.sb-win-check input { width: 1.1rem; height: 1.1rem; accent-color: var(--brand-600); }
+:is(.sb-win-btn, .sb-win-x, .sb-win-act):focus-visible { outline: 3px solid var(--brand-400); outline-offset: 2px; }
+
+/* ---------------------------------------------------------------- 아래쪽 버튼 줄 */
+.sb-win-foot {
+  flex: none; display: flex; justify-content: flex-end; align-items: center; gap: 0.6rem;
+  padding: 0.9rem 1.1rem; border-top: 1px solid rgb(var(--sk-line)); background: rgb(var(--sk-surface-2) / 0.75);
+}
+.sb-win-foot-split { justify-content: space-between; }
+.sb-win-foot button { border-radius: 0.95rem !important; }
+
+/* ---------------------------------------------------------------- 알림·확인 상자 */
+.sb-dialog { display: flex; flex-direction: column; align-items: stretch; padding: 2rem 2rem 1.6rem; }
+#alarm-countdown { align-self: center; }
+.sb-dialog-ico { width: 4.5rem; height: 4.5rem; border-radius: 1.4rem; margin: 0 auto 1.1rem; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 20px 34px -16px rgba(0, 0, 0, 0.6); }
+.sb-dialog-ico svg { width: 2.2rem; height: 2.2rem; }
+.sb-dialog > h1, .sb-dialog > h2 { font-weight: 800; letter-spacing: -0.02em; }
+.sb-dialog button { border-radius: 1rem !important; }
+#modal-alarm .sb-dialog { padding: 2.6rem 2.6rem 2.2rem; }
+#modal-alarm .sb-dialog-ico { width: 6rem; height: 6rem; border-radius: 1.8rem; animation: sb-ring 1.6s ease-in-out infinite; }
+#modal-alarm .sb-dialog-ico svg { width: 3rem; height: 3rem; }
+@keyframes sb-ring { 0%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(-9deg); } 20%, 40% { transform: rotate(9deg); } 50% { transform: rotate(0); } }
+#modal-picker-result .sb-dialog { padding: 2.4rem 2.4rem 2rem; }
+#modal-picker-result button.bg-purple-600 { background: #7b2f55; }
+#modal-picker-result button.bg-purple-600:hover { background: #5f2342; }
+#picker-result-text .text-purple-500, #picker-result-text .text-purple-600 { color: #7b2f55; }
+#picker-result-text .text-purple-800 { color: #4a1f45; }
+#picker-result-text .bg-purple-100 { background-color: #f6e7ee; }
+[data-skin="dark"] #picker-result-text .text-purple-500, [data-skin="dark"] #picker-result-text .text-purple-600 { color: #f0a3c4; }
+
+/* 모달 창이 열려 있으면 떠 있는 창(타이머·학습 약속 등)은 그 뒤로 (예전엔 설정 창의 버튼을 가렸음). 수업 종 알림은 더 위(z 120) */
+body:has(.modal.active) .sb-floating { z-index: 45 !important; }
+
+/* ---------------------------------------------------------------- 떠 있는 도구 창 공통 */
+.sb-tool-body { display: flex; flex-direction: column; gap: 0.85rem; padding: 1.05rem 1.15rem 1.2rem; }
+.sb-btn-lg { min-height: 3.4rem; font-size: 1.15rem; border-radius: 1.1rem; }
+.sb-btn-sm { min-height: 2.4rem; padding: 0 0.85rem; font-size: 0.85rem; }
+.sb-check { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 2rem; cursor: pointer; }
+.sb-check input { width: 1.05rem; height: 1.05rem; accent-color: var(--brand-600); }
+
+/* 타이머 */
+.sb-timer-display { font-family: "Nunito", var(--sk-font); font-weight: 800; font-size: 5.4rem; line-height: 0.95; letter-spacing: -0.035em; text-align: center; color: rgb(var(--sk-text-1)); margin-top: 0.2rem; }
+.sb-timer-display.text-red-500 { color: #dc2626; }
+#floating-timer:has(#btn-timer-toggle[data-state="running"]) .sb-timer-display:not(.text-red-500) { color: var(--brand-700); }
+.sb-timer-track { height: 0.6rem; border-radius: 999px; background: rgb(var(--sk-surface-4)); overflow: hidden; }
+#timer-progress.bg-blue-500 { background: var(--brand-500) !important; }
+.sb-timer-warn { text-align: center; font-size: 1.1rem; font-weight: 800; color: #dc2626; }
+.sb-timer-warns { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.3rem 0.8rem; font-size: 0.88rem; font-weight: 700; color: rgb(var(--sk-text-3)); user-select: none; }
+.sb-timer-add { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.4rem; }
+.sb-timer-add button, .sb-wt-add button {
+  min-height: 2.75rem; border: 1px solid rgb(var(--sk-line)); border-radius: 0.85rem; background: rgb(var(--sk-surface));
+  color: rgb(var(--sk-text-2)); font: inherit; font-size: 0.95rem; font-weight: 800; cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
+}
+.sb-timer-add button:hover, .sb-wt-add button:hover { border-color: var(--brand-300); color: var(--brand-700); background: var(--brand-50); }
+.sb-timer-add button:active, .sb-wt-add button:active { transform: scale(0.96); }
+.sb-timer-ctrl { display: grid; grid-template-columns: 1fr 1.7fr; gap: 0.5rem; }
+#btn-timer-toggle[data-state="running"] { background: rgb(var(--sk-ink)); }
+
+/* 소음 측정기 */
+.sb-noise-lights { display: flex; justify-content: center; gap: 1rem; padding: 0.7rem; border-radius: 999px; background: rgb(var(--sk-ink)); box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.45); }
+.sb-noise-light { width: 2.7rem; height: 2.7rem; border-radius: 50%; transition: opacity 0.2s, box-shadow 0.2s; }
+.sb-noise-meter { position: relative; height: 1.1rem; border-radius: 999px; background: rgb(var(--sk-surface-4)); overflow: hidden; }
+.sb-noise-limit { position: absolute; top: 0; bottom: 0; left: 80%; width: 2px; background: #dc2626; }
+.sb-noise-row { display: flex; align-items: center; gap: 0.75rem; min-height: 2.9rem; padding: 0 0.9rem; border-radius: 0.95rem; background: rgb(var(--sk-surface-2)); font-size: 0.9rem; font-weight: 800; color: rgb(var(--sk-text-2)); cursor: pointer; }
+.sb-noise-row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--brand-600); }
+.sb-noise-row b { width: 1.6rem; text-align: right; color: var(--brand-700); }
+.sb-noise-count { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding-top: 0.8rem; border-top: 1px solid rgb(var(--sk-line)); font-weight: 800; color: rgb(var(--sk-text-2)); }
+.sb-noise-count b { font-family: "Nunito", var(--sk-font); font-size: 2rem; color: #dc2626; margin: 0 0.15rem; vertical-align: -0.15em; }
+.sb-noise-rules { display: flex; flex-direction: column; gap: 0.4rem; }
+.sb-noise-rule { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; font-weight: 700; color: rgb(var(--sk-text-3)); }
+.sb-noise-rule input { min-height: 2.5rem; padding: 0 0.6rem; border: 1px solid rgb(var(--sk-line-2)); border-radius: 0.75rem; background: rgb(var(--sk-surface)); color: rgb(var(--sk-text-1)); font: inherit; font-size: 0.9rem; font-weight: 800; }
+.sb-noise-rule input[type="number"] { width: 3.5rem; text-align: center; color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+.sb-noise-rule input[type="text"] { flex: 1; min-width: 0; }
+
+/* 팝업 노트: 노란 쪽지 */
+.sb-tool-note { background: #fff8db; color: #422006; }
+.sb-floating.sb-tool-note { border-color: rgba(161, 98, 7, 0.28) !important; }
+.sb-tool-note .sb-win-head { background: #fdeeb0; border-bottom-color: rgba(161, 98, 7, 0.2); }
+.sb-tool-note .sb-win-title { color: #713f12; }
+.sb-tool-note .sb-win-btn { color: #854d0e; }
+.sb-tool-note .sb-win-btn:hover { background: rgba(161, 98, 7, 0.14); color: #713f12; }
+.sb-tool-note .sb-win-x { background: rgba(161, 98, 7, 0.14); color: #713f12; }
+.sb-tool-note .sb-win-x:hover { background: #a16207; color: #fff; }
+.sb-note-tools { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.5rem 0.85rem; border-bottom: 1px solid rgba(161, 98, 7, 0.15); background: #fff3c4; }
+.sb-note-size { display: flex; align-items: center; background: #fff; border-radius: 0.85rem; box-shadow: 0 0 0 1px rgba(161, 98, 7, 0.22); }
+.sb-note-size button { width: 2.6rem; height: 2.6rem; border: 0; padding: 0; border-radius: 0.85rem; background: transparent; color: #713f12; display: grid; place-items: center; cursor: pointer; }
+.sb-note-size button:hover { background: #fef3c7; }
+.sb-note-size svg { width: 1rem; height: 1rem; }
+#popup-note-size-display { width: 2rem; text-align: center; font-size: 0.95rem; font-weight: 800; color: #713f12; }
+.sb-note-bold { width: 2.6rem; height: 2.6rem; border: 0; border-radius: 0.85rem; font-family: "Nunito", sans-serif; font-size: 1.15rem; font-weight: 800; color: #713f12; box-shadow: 0 0 0 1px rgba(161, 98, 7, 0.22); cursor: pointer; }
+.sb-note-bold.bg-white { background: #fff; }
+.sb-note-bold.bg-amber-300 { background: #fcd34d; }
+.sb-note-colors { display: flex; gap: 0.5rem; }
+.sb-note-color { width: 2rem; height: 2rem; padding: 0; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: transform 0.15s; }
+.sb-note-color:hover { transform: scale(1.1); }
+.sb-note-color.ring-2 { box-shadow: 0 0 0 2px #fff3c4, 0 0 0 4px #b45309; }
+.sb-note-text { color: #1e293b; }
+.sb-tool-note :is(button):focus-visible { outline: 3px solid #b45309; outline-offset: 2px; }
+
+/* 학습 약속 (떠 있는 알약과 메뉴) */
+#activity-indicator { background: rgb(var(--sk-surface) / 0.96) !important; border-radius: 1.6rem !important; padding: 0.7rem 1.2rem 0.7rem 0.7rem !important; }
+#activity-icon-bg { border-radius: 1.05rem !important; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+#activity-icon-bg.bg-blue-500 { background-color: #0369a1 !important; }
+#activity-icon-bg.bg-emerald-500 { background-color: #15803d !important; }
+#activity-icon-bg.bg-orange-500 { background-color: #c2410c !important; }
+#activity-menu { background: rgb(var(--sk-surface) / 0.97) !important; border-radius: 1.6rem !important; }
+#activity-menu button { border-radius: 1.1rem; }
+#activity-menu .bg-blue-500 { background-color: #0369a1 !important; }
+#activity-menu .bg-emerald-500 { background-color: #15803d !important; }
+#activity-menu .bg-orange-500 { background-color: #c2410c !important; }
+
+/* ---------------------------------------------------------------- 오로라 테마: 유리 창 */
+[data-skin="aurora"] .modal { background-color: rgba(43, 16, 41, 0.45) !important; }
+[data-skin="aurora"] .sb-win,
+[data-skin="aurora"] .sb-tool:not(.sb-tool-note) {
+  background: rgba(255, 253, 251, 0.9);
+  backdrop-filter: blur(30px) saturate(1.6); -webkit-backdrop-filter: blur(30px) saturate(1.6);
+}
+[data-skin="aurora"] .sb-win-head, [data-skin="aurora"] .sb-win-foot { background: rgba(250, 240, 236, 0.7); border-color: rgba(42, 16, 39, 0.08); }
+[data-skin="aurora"] .sb-tool-note .sb-win-head { background: #fdeeb0; }
+[data-skin="aurora"] #activity-indicator, [data-skin="aurora"] #activity-menu { background: rgba(255, 253, 251, 0.88) !important; backdrop-filter: blur(24px) saturate(1.6); -webkit-backdrop-filter: blur(24px) saturate(1.6); }
+
+@media (prefers-reduced-motion: reduce) {
+  #modal-alarm .sb-dialog-ico { animation: none; }
+}
