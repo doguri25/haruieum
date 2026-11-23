@@ -104,7 +104,17 @@ class AppStorage {
     let text: string | null = null, readErr: unknown = null;
     try { text = await invoke<string>("load_store", { name: b }); } catch (e) { readErr = e; }
     if (text !== null) {
-      try { return parse(text); } catch (e) { console.warn(`${b}.json 이 손상되어 백업을 시도합니다:`, e); }
+      try {
+        const obj = parse(text);
+        if (obj) return obj;
+        // 3.1.1: 빈 내용 = 파일이 없거나(처음 실행) 0바이트(쓰는 중 전원이 꺼짐 등). 0바이트면 .bak 이 남아 있을 수 있음.
+        // 예전엔 바로 '처음 실행'으로 보고 빈 상태로 시작해, 다음 저장 때 멀쩡한 .bak 까지 덮어썼음
+        try {
+          const bak = parse(await invoke<string>("load_store_backup", { name: b }));
+          if (bak) { console.warn(`${b}.json 이 비어 있어 .bak 에서 복구했습니다.`); this.dirty.add(b); return bak; }
+        } catch { /* 백업 없음 → 처음 실행 */ }
+        return null;
+      } catch (e) { console.warn(`${b}.json 이 손상되어 백업을 시도합니다:`, e); }
     } else {
       console.warn(`${b}.json 을 읽을 수 없어 백업을 시도합니다:`, readErr);
     }

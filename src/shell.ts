@@ -48,8 +48,8 @@ export function computeStatus(now = new Date()): Status {
   if (!slots.length) return { badge: "오늘", title: "오늘 수업이 없어요", sub: "시간표에서 과목을 적어 주세요", progress: 0, live: false };
   const t = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
   const minute = Math.floor(t);
-  // 기능 코드(updateTimetableHighlight)와 같게: 끝나는 분(예: 10:30)까지는 그 교시
-  const cur = slots.find((s) => minute >= s.start && minute <= s.end);
+  // 기능 코드(updateTimetableHighlight)와 같게: 끝나는 분(예: 10:30)까지는 그 교시. 단 그 분에 시작하는 칸이 있으면 그 칸 (3.1.1)
+  const cur = slots.find((s) => minute >= s.start && minute < s.end) ?? slots.find((s) => minute === s.end);
   if (cur) {
     const left = Math.ceil(cur.end - t);
     const span = Math.max(1, cur.end - cur.start);

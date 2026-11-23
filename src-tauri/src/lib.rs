@@ -440,12 +440,16 @@ fn import_backup(app: tauri::AppHandle, src: String, stamp: String) -> Result<St
         }
         staged.push((tmp, dir.join(entry_name)));
     }
-    for name in STORE_NAMES {
-        let _ = std::fs::remove_file(dir.join(format!("{name}.json.bak")));
-        let _ = std::fs::remove_file(dir.join(format!("{name}.json")));
-    }
+    // 3.1.1: 먼저 새 파일로 바꿔 끼우고(rename 은 있던 파일을 바로 대체) 그다음에 지움.
+    // 예전엔 본 파일을 모두 지운 뒤 바꿔 끼워, 그 사이에 앱이 꺼지면 저장 파일이 하나도 없는 상태가 됐음
+    let restored: Vec<std::path::PathBuf> = staged.iter().map(|(_, t)| t.clone()).collect();
     for (tmp, target) in staged {
         std::fs::rename(&tmp, &target).map_err(|e| e.to_string())?;
+    }
+    for name in STORE_NAMES {
+        let _ = std::fs::remove_file(dir.join(format!("{name}.json.bak")));
+        let main = dir.join(format!("{name}.json"));
+        if !restored.contains(&main) { let _ = std::fs::remove_file(&main); }
     }
     Ok(before.to_string_lossy().to_string())
 }

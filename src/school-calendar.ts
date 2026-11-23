@@ -127,8 +127,12 @@ export async function upcomingEvents(days = 14): Promise<SchoolEvent[] | null> {
   if (!getSchool()) return null;
   const now = new Date();
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
-  if (end.getMonth() !== now.getMonth() && !cache().months[monthKey(end.getFullYear(), end.getMonth())]) {
-    try { await loadMonth(end.getFullYear(), end.getMonth()); } catch { /* 저장된 것만으로 */ }
+  // 3.1.1: 이번 달도 저장돼 있지 않으면 받음 (예전엔 다음 달만 받아, 새 달 첫날·학교를 처음 정한 날엔 '일정 없음'이 30분 동안 보였음)
+  const months = [[now.getFullYear(), now.getMonth()], [end.getFullYear(), end.getMonth()]];
+  if (end.getMonth() === now.getMonth()) months.pop();
+  for (const [y, mo] of months) {
+    if (cache().months[monthKey(y, mo)]) continue;
+    try { await loadMonth(y, mo); } catch { /* 저장된 것만으로 */ }
   }
   const out: SchoolEvent[] = [];
   for (let i = 0; i <= days; i++) out.push(...eventsOn(new Date(now.getFullYear(), now.getMonth(), now.getDate() + i)));

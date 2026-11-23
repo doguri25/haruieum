@@ -227,3 +227,6 @@ body:has(.modal.active) .sb-floating { z-index: 45 !important; }
   .sb-wt-ctrl .sb-w-btn svg { display: none; }
   .sb-wt-ctrl .sb-w-btn { padding: 0 0.6rem; }
 }
+
+/* 떠 있는 창의 크기 손잡이: 3.1.0 의 둥근 모서리(약 1.85rem)에 대부분 잘려 누르기 어려웠음 → 크게 해서 안쪽 띠가 남게 */
+.sb-floating .sb-resize-grip { width: 2.5rem; height: 2.5rem; }

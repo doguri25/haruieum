@@ -6,11 +6,14 @@
 import "./image-viewer.css";
 
 let overlay: HTMLElement | null = null;
+/** 닫을 때 해제할 임시 주소 (QR 크게 보기처럼 이 창만 쓰는 blob: 주소) — 3.1.1 */
+let ownedUrl: string | null = null;
 
 function close() {
   if (!overlay) return;
   const el = overlay;
   overlay = null;
+  if (ownedUrl) { const u = ownedUrl; ownedUrl = null; window.setTimeout(() => URL.revokeObjectURL(u), 200); }
   el.dispatchEvent(new Event("remove-fit"));
   el.classList.add("closing");
   window.setTimeout(() => el.remove(), 150);
@@ -21,9 +24,10 @@ function onKey(e: KeyboardEvent) {
   if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); }
 }
 
-export function openImageViewer(src: string) {
+export function openImageViewer(src: string, opts: { revokeOnClose?: boolean } = {}) {
   if (!src) return;
   close();
+  if (opts.revokeOnClose && src.startsWith("blob:")) ownedUrl = src;
   const el = document.createElement("div");
   el.id = "sb-image-viewer";
   el.setAttribute("role", "dialog");

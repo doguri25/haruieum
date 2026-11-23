@@ -148,6 +148,13 @@ class BoardEditor {
   init(container: HTMLElement) {
     this.container = container;
     this.toolbar = document.getElementById("image-action-toolbar");
+    // 3.1.1: TipTap 의 사진 크기 조절은 손가락(touchstart·touchmove)으로 시작해도 끝은 mouseup 만 기다림.
+    // 터치는 mouseup 이 오지 않아 손을 떼도 조절이 끝나지 않고 크기도 저장되지 않았음 → 손을 떼면 mouseup 을 대신 보냄
+    const endTouchResize = () => {
+      if (document.querySelector("[data-resize-state='true']")) document.dispatchEvent(new MouseEvent("mouseup"));
+    };
+    document.addEventListener("touchend", endTouchResize, true);
+    document.addEventListener("touchcancel", endTouchResize, true);
     this.editor = new Editor({
       element: container,
       extensions: [

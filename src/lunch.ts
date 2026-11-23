@@ -197,20 +197,25 @@ export type WidgetMeal =
   | { status: "no-school" }
   | { status: "ok"; label: string; dishes: Dish[]; cal: string; allergens: number[] }
   | { status: "none"; label: string };
-let widgetCache: { key: string; meal: Meal | null } | null = null;
+let widgetCache: { key: string; meal: Meal | null; at: number } | null = null;
 /** 오늘(주말이면 다음 월요일) 급식. 같은 학교·같은 날은 한 번만 받음 */
 export async function widgetMeal(force = false): Promise<WidgetMeal> {
   const school = getSchool();
   if (!school) return { status: "no-school" };
   const d = skipWeekend(dayOnly(new Date()), 1);
   const key = `${school.officeCode}:${school.code}:${ymd(d)}`;
-  if (force || !widgetCache || widgetCache.key !== key) {
+  // 3.1.1: 같은 날이라도 오래되면 다시 받음 — 비어 있으면 30분, 있으면 6시간.
+  // 예전엔 주말에 받아 둔 '월요일 급식 없음'이 월요일 내내 남는 등 한 번 받은 값이 바뀌지 않았음
+  const age = widgetCache ? Date.now() - widgetCache.at : Infinity;
+  const stale = !widgetCache || widgetCache.key !== key || age > (widgetCache.meal ? 6 * 3600_000 : 30 * 60_000);
+  let cached = widgetCache;
+  if (force || stale || !cached) {
     const rows = await neisRows("mealServiceDietInfo", { ATPT_OFCDC_SC_CODE: school.officeCode, SD_SCHUL_CODE: school.code, MLSV_YMD: ymd(d) });
-    widgetCache = { key, meal: rows.length ? rowToMeal(pickLunch(rows)) : null };
+    cached = widgetCache = { key, meal: rows.length ? rowToMeal(pickLunch(rows)) : null, at: Date.now() };
   }
   const rel = relLabel(d);
   const label = rel ? `${rel} 급식` : `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAYS[d.getDay()]}) 급식`;
-  const m = widgetCache.meal;
+  const m = cached.meal;
   if (!m || !m.dishes.length) return { status: "none", label };
   return { status: "ok", label, dishes: m.dishes, cal: m.cal, allergens: getAllergens() };
 }

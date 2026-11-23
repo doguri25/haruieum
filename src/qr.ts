@@ -68,7 +68,7 @@ export function onQrInput() { window.clearTimeout(timer); timer = window.setTime
 
 export async function showQrLarge() {
   if (!current) return;
-  openImageViewer(URL.createObjectURL(await toPng(current, 24)));
+  openImageViewer(URL.createObjectURL(await toPng(current, 24)), { revokeOnClose: true });
 }
 
 export async function insertQrToBoard() {

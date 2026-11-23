@@ -27,12 +27,14 @@ function setStatus(msg: string, kind: "info" | "ok" | "error" = "info") {
   s.classList.remove("hidden");
 }
 
+let lastCheckFailed = false;
 export async function check(silent: boolean): Promise<UpdateInfo | null> {
   if (!isTauri()) { if (!silent) setStatus("업데이트 확인은 앱에서만 됩니다.", "error"); return null; }
   const url = getUpdateUrl();
   if (!silent) setStatus("확인 중...");
   try {
     const info = await invoke<UpdateInfo | null>("check_update", { endpoint: url });
+    lastCheckFailed = false;
     if (info) {
       pending = info;
       if (!silent) setStatus(`새 버전 v${info.version} 이 있습니다. (현재 v${info.current})`, "ok");
@@ -41,6 +43,7 @@ export async function check(silent: boolean): Promise<UpdateInfo | null> {
     return info;
   } catch (e) {
     console.warn("업데이트 확인 실패:", e);
+    lastCheckFailed = true;
     if (!silent) setStatus("확인 실패: " + String(e).slice(0, 120), "error");
     return null;
   }
@@ -114,8 +117,20 @@ export function saveUpdateSettings() {
 
 export function initUpdater() {
   if (!isTauri() || !isAutoUpdate() || !getUpdateUrl()) return;
-  window.setTimeout(() => void check(true), 8000);           // 시작 8초 뒤 한 번
-  window.setInterval(() => void check(true), 6 * 3600 * 1000); // 이후 6시간마다
+  // 3.1.1: 켜자마자 인터넷이 아직 안 잡혀 확인에 실패하면 2·5·15·30분 뒤 다시 (예전엔 6시간 뒤까지 기다려
+  //        6시간 안에 끄는 PC는 업데이트를 영영 못 받았음). 인터넷이 다시 연결돼도 바로 확인
+  const RETRY_MIN = [2, 5, 15, 30];
+  let retry = 0, retryTimer: number | undefined;
+  const auto = async () => {
+    window.clearTimeout(retryTimer);
+    if (pending) return;
+    await check(true);
+    if (lastCheckFailed && retry < RETRY_MIN.length) retryTimer = window.setTimeout(auto, RETRY_MIN[retry++] * 60_000);
+    else if (!lastCheckFailed) retry = 0;
+  };
+  window.setTimeout(() => void auto(), 8000);                 // 시작 8초 뒤 한 번
+  window.setInterval(() => { retry = 0; void auto(); }, 6 * 3600 * 1000); // 이후 6시간마다
+  window.addEventListener("online", () => { if (lastCheckFailed) { retry = 0; void auto(); } });
 }
 
 declare global { interface Window { updater: { checkNow: () => Promise<void>; install: () => Promise<void>; renderSettings: () => void; saveSettings: () => void } } }

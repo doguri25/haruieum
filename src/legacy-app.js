@@ -22,7 +22,14 @@ export function startLegacyApp() {
         // (일렉트론 전용 localStorage 파일 패치는 제거됨 — 3단계에서 Tauri 파일 저장으로 대체)
 
         let timeSlots = [ { id: 1, name: '1교시', start: '09:00', end: '09:40' }, { id: 2, name: '2교시', start: '09:50', end: '10:30' }, { id: 3, name: '3교시', start: '10:40', end: '11:20' }, { id: 4, name: '4교시', start: '11:30', end: '12:10' }, { id: 5, name: '점심', start: '12:10', end: '13:00' }, { id: 6, name: '5교시', start: '13:00', end: '13:40' }, { id: 7, name: '6교시', start: '13:50', end: '14:30' } ];
-        try { if(storage.getItem('smartBoardTimeSlots')) timeSlots = JSON.parse(storage.getItem('smartBoardTimeSlots')); } catch(e){}
+        // 3.1.1: 저장 파일(복원한 백업 등)의 시간 값은 'HH:MM' 만 받음 — 시간표 innerHTML 에 그대로 들어가므로
+        try {
+            const savedSlots = JSON.parse(storage.getItem('smartBoardTimeSlots') || 'null');
+            if (Array.isArray(savedSlots) && savedSlots.length === timeSlots.length) {
+                const hm = v => (typeof v === 'string' && /^\d{2}:\d{2}$/.test(v)) ? v : '';
+                timeSlots = timeSlots.map((d, i) => { const o = savedSlots[i] || {}; return { id: d.id, name: typeof o.name === 'string' ? o.name : d.name, start: hm(o.start) || d.start, end: hm(o.end) || d.end }; });
+            }
+        } catch(e){}
 
         let schedule = { 1: ['국어', '사회', '수학', '과학', '점심', '체육', '미술'], 2: ['수학', '국어', '영어', '음악', '점심', '도덕', '실과'], 3: ['사회', '과학', '체육', '국어', '점심', '수학', ''], 4: ['영어', '수학', '국어', '사회', '점심', '과학', '체육'], 5: ['국어', '도덕', '미술', '미술', '점심', '수학', '창체'] };
         try { if(storage.getItem('smartBoardSchedule')) schedule = JSON.parse(storage.getItem('smartBoardSchedule')); } catch(e){}
@@ -82,7 +89,7 @@ export function startLegacyApp() {
         let timerWarned = {};
         let timerWarn = { 5: true, 3: true, 1: true };
         try { const w = JSON.parse(storage.getItem('smartBoardTimerWarn') || 'null'); if (w && typeof w === 'object') timerWarn = { ...timerWarn, ...w }; } catch(e) {}
-        let audioCtx = null; let isAudioPlaying = false; let currentOscillators = []; let chimeTimeout = null; let alarmCountdownIntervalId = null;
+        let audioCtx = null; let isAudioPlaying = false; let currentOscillators = []; let chimeTimeout = null; let alarmCountdownIntervalId = null; let isPreviewPlaying = false; // 3.1.1: 미리 듣기 중인지 (설정 창을 닫을 때 진짜 수업 종까지 끊지 않게)
         let currentMp3Audio = null;
         let currentCalendarDate = new Date(); let isFakeFullscreen = false;
         
@@ -520,7 +527,7 @@ export function startLegacyApp() {
                 m.classList.remove('active'); 
                 if (id === 'modal-weather') document.getElementById('region-selector-panel')?.classList.add('hidden'); 
                 if (id === 'modal-lunch') document.getElementById('school-selector-panel')?.classList.add('hidden'); 
-                if (id === 'modal-alarm-settings' || id === 'modal-alarm') stopAudio(); 
+                if (id === 'modal-alarm-settings') stopPreview(); 
             } 
         }
 
@@ -593,7 +600,7 @@ export function startLegacyApp() {
             
             closeModal('modal-alarm-settings'); 
             renderTimetable(); 
-            stopAudio(); 
+            stopPreview(); 
         }
 
         function toggleAllReset(el) { const chk = el.checked; ['reset-board', 'reset-note', 'reset-table', 'reset-alarm'].forEach(id => document.getElementById(id).checked = chk); }
@@ -621,7 +628,7 @@ export function startLegacyApp() {
                 ['smartBoardLunchPos', 'smartBoardTimeSlots', 'smartBoardSchedule', 'smartBoardDailyOverride'].forEach(k=>storage.removeItem(k)); 
             } 
             if(document.getElementById('reset-alarm').checked) { 
-                ['smartBoardStartOffset','smartBoardEndOffset','smartBoardStartMsg','smartBoardEndMsg','smartBoardClosingMsg','smartBoardAlarmMelody','smartBoardCustomAlarmEnabled','smartBoardMutedPeriods','smartBoardVolume', 'smartBoardAlarmPopupEnabled', 'smartBoardLeaveWorkEnabled', 'smartBoardLeaveWorkTime', 'smartBoardLeaveWorkPopupEnabled', 'smartBoardLeaveWorkPopupDuration'].forEach(k=>storage.removeItem(k)); 
+                ['smartBoardStartOffset','smartBoardEndOffset','smartBoardStartMsg','smartBoardEndMsg','smartBoardClosingMsg','smartBoardAlarmMelody','smartBoardCustomAlarmEnabled','smartBoardMutedPeriods','smartBoardVolume', 'smartBoardAlarmPopupEnabled', 'smartBoardLeaveWorkEnabled', 'smartBoardLeaveWorkTime', 'smartBoardLeaveWorkPopupEnabled', 'smartBoardLeaveWorkPopupDuration', 'smartBoardAlarmDuration', 'smartBoardCustomMp3', 'smartBoardCustomAlarmTime', 'smartBoardCustomAlarmMsg', 'smartBoardCustomAlarmFreq'].forEach(k=>storage.removeItem(k)); // 3.1.1: 알람 유지 시간·MP3·지정 알람도
             } 
  
             // 2.8.2: 명렬표·학교 등 목록에 없는 항목은 네 항목을 모두 체크했을 때만 (예전엔 '전체선택' 뒤 하나를 풀어도 지워졌음)
@@ -829,18 +836,29 @@ export function startLegacyApp() {
             });
             refreshIcons();
         }
-        function sanitizeHtml(html) {
+        // 3.1.1: 깨끗하게 한 노드를 문자열로 바꿔 다시 innerHTML 에 넣으면 <noscript>·주석 안에 숨긴 태그가 되살아남(mXSS)
+        //        → 주석·noscript 류도 지우고, 문자열로 되돌리지 않고 노드를 그대로 옮겨 넣음
+        function sanitizeBody(html) {
             const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
-            doc.body.querySelectorAll('script,iframe,object,embed,base,link,meta,style,form,frame,frameset,svg,math,template').forEach(n => n.remove());
+            doc.body.querySelectorAll('script,iframe,object,embed,base,link,meta,style,form,frame,frameset,svg,math,template,noscript,noembed,noframes,xmp,plaintext').forEach(n => n.remove());
+            const tw = doc.createTreeWalker(doc.body, NodeFilter.SHOW_COMMENT); const cm = [];
+            while (tw.nextNode()) cm.push(tw.currentNode);
+            cm.forEach(n => n.remove());
             doc.body.querySelectorAll('*').forEach(n => {
                 for (const at of [...n.attributes]) {
                     const name = at.name.toLowerCase(), val = at.value.replace(/[\s\u0000-\u001f]+/g, '').toLowerCase();
                     if (name.startsWith('on') || ((name === 'href' || name === 'src' || name === 'xlink:href' || name === 'action' || name === 'formaction') && (val.startsWith('javascript:') || val.startsWith('vbscript:')))) n.removeAttribute(at.name);
                 }
             });
-            return doc.body.innerHTML;
+            return doc.body;
         }
-        function viewSavedBoard(id) { const b = savedBoards.find(x => x.id === id); if(!b) return; viewingBoardId = id; document.getElementById('viewer-date').innerText = b.date; const vc = document.getElementById('viewer-content'); vc.innerHTML = sanitizeHtml(b.content); if (window.boardImages) window.boardImages.resolveImagesIn(vc); document.getElementById('modal-board-viewer').classList.add('active'); }
+        function sanitizeHtml(html) { return sanitizeBody(html).innerHTML; }
+        function setSanitizedContent(el, html) {
+            const body = sanitizeBody(html); const frag = document.createDocumentFragment();
+            while (body.firstChild) frag.appendChild(document.adoptNode(body.firstChild));
+            el.replaceChildren(frag);
+        }
+        function viewSavedBoard(id) { const b = savedBoards.find(x => x.id === id); if(!b) return; viewingBoardId = id; document.getElementById('viewer-date').innerText = b.date; const vc = document.getElementById('viewer-content'); setSanitizedContent(vc, b.content); if (window.boardImages) window.boardImages.resolveImagesIn(vc); document.getElementById('modal-board-viewer').classList.add('active'); }
         // ---------- 2.7.0: 보관한 기록 다시 불러와 고치기 ----------
         // [판서] 기록은 판서로, [알림] 기록은 알림으로, 그 밖(팝업노트 등)은 지금 화면으로 불러옴.
         // 지금 내용이 있으면 확인을 받고, 덮어쓰기 전에 지금 내용을 목록에 자동 보관함 (잃어버리지 않게)
@@ -961,7 +979,7 @@ export function startLegacyApp() {
                 el.className = `flex items-center px-3 py-2 rounded-2xl border-2 border-slate-200 bg-slate-50 transition-all duration-300 timetable-slot flex-1 min-h-[48px]`; 
                 el.dataset.start = sl.start; 
                 el.dataset.end = sl.end; 
-                el.innerHTML = `<div class="flex items-center flex-1 cursor-pointer hover:bg-slate-200/50 rounded-lg p-1" onclick="toggleMutePeriod(${i})"><div class="flex w-[5.5rem] shrink-0 items-center justify-center relative"><span class="text-2xl font-bold ${m?'text-slate-400':'text-slate-800'} slot-name">${sl.name}</span>${m?'<i data-lucide="bell-off" class="w-4 h-4 text-red-400 absolute -right-2"></i>':''}</div><span class="text-xl font-bold ${m?'text-slate-400 line-through':'text-slate-600'} flex-1 text-center whitespace-nowrap slot-time">${sl.start} - ${sl.end}</span></div><input type="text" value="${escHtml(s[i]||'')}" onchange="updateSubjectFast(${i}, this)" class="text-2xl font-bold px-2 py-1.5 rounded-xl border-2 shrink-0 w-32 text-center shadow-sm outline-none ${getSubjectColorClasses(s[i])} ml-1 slot-subject">`; 
+                el.innerHTML = `<div class="flex items-center flex-1 cursor-pointer hover:bg-slate-200/50 rounded-lg p-1" onclick="toggleMutePeriod(${i})"><div class="flex w-[5.5rem] shrink-0 items-center justify-center relative"><span class="text-2xl font-bold ${m?'text-slate-400':'text-slate-800'} slot-name">${escHtml(sl.name)}</span>${m?'<i data-lucide="bell-off" class="w-4 h-4 text-red-400 absolute -right-2"></i>':''}</div><span class="text-xl font-bold ${m?'text-slate-400 line-through':'text-slate-600'} flex-1 text-center whitespace-nowrap slot-time">${escHtml(sl.start)} - ${escHtml(sl.end)}</span></div><input type="text" value="${escHtml(s[i]||'')}" onchange="updateSubjectFast(${i}, this)" class="text-2xl font-bold px-2 py-1.5 rounded-xl border-2 shrink-0 w-32 text-center shadow-sm outline-none ${getSubjectColorClasses(s[i])} ml-1 slot-subject">`; 
                 c.appendChild(el); 
             }); 
             updateTimetableHighlight(now); 
@@ -1042,7 +1060,7 @@ export function startLegacyApp() {
 
         function playAlarmMelody(type, ttsText, isPreview = false) { 
             if(globalVolume === 0) { if (ttsText && !isPreview) playTTS(ttsText); return 5; }
-            stopAudio(); initAudio(); isAudioPlaying = true; 
+            stopAudio(); initAudio(); isAudioPlaying = true; isPreviewPlaying = !!isPreview; 
 
             if (type === 4) {
                 // 고른 파일이 없으면 기본음(public/alarm.mp3). 예전엔 경고창만 뜨고 아무 소리도 안 났음
@@ -1191,7 +1209,7 @@ export function startLegacyApp() {
             const l = document.getElementById('settings-time-list'); 
             l.innerHTML = ''; 
             timeSlots.forEach((slot, i) => { 
-                l.innerHTML += `<div class="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100 gap-1"><span class="font-bold whitespace-nowrap text-sm w-12">${slot.name}</span><input type="time" id="time-start-${i}" value="${slot.start}" class="p-1.5 border rounded-lg font-bold flex-1 w-full text-center"><span class="font-bold">-</span><input type="time" id="time-end-${i}" value="${slot.end}" class="p-1.5 border rounded-lg font-bold flex-1 w-full text-center"></div>`; 
+                l.innerHTML += `<div class="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100 gap-1"><span class="font-bold whitespace-nowrap text-sm w-12">${escHtml(slot.name)}</span><input type="time" id="time-start-${i}" value="${escHtml(slot.start)}" class="p-1.5 border rounded-lg font-bold flex-1 w-full text-center"><span class="font-bold">-</span><input type="time" id="time-end-${i}" value="${escHtml(slot.end)}" class="p-1.5 border rounded-lg font-bold flex-1 w-full text-center"></div>`; 
             }); 
         }
 
@@ -1345,7 +1363,8 @@ export function startLegacyApp() {
                 btn.classList.replace('bg-yellow-500', 'bg-blue-600'); btn.classList.replace('hover:bg-yellow-600', 'hover:bg-blue-700'); 
                 updateTimerDisplay();
             } else { 
-                if (timerRemaining <= 0) return; 
+                if (timerRemaining <= 0) return;
+                timerEndPending = false; // 3.1.1: 종소리 중에 끝난 앞 타이머의 '종료' 알림이 새 타이머 위에 뜨지 않게 
                 if (timerTotal < timerRemaining) timerTotal = timerRemaining;
                 timerEndAt = Date.now() + timerRemaining * 1000;
                 isTimerRunning = true; btn.innerText = '정지'; btn.dataset.state = 'running'; 
@@ -1368,7 +1387,7 @@ export function startLegacyApp() {
                 if (soundBusy()) timerEndPending = true; else fireTimerEnd();
             }
         }
-        function resetTimer() { isTimerRunning = false; timerEndAt = 0; timerRemaining = 0; timerTotal = 0; timerWarned = {}; updateTimerDisplay(); const btn = document.getElementById('btn-timer-toggle'); btn.innerText = '시작'; btn.dataset.state = 'idle'; btn.classList.replace('bg-yellow-500', 'bg-blue-600'); btn.classList.replace('hover:bg-yellow-600', 'hover:bg-blue-700'); }
+        function resetTimer() { timerEndPending = false; isTimerRunning = false; timerEndAt = 0; timerRemaining = 0; timerTotal = 0; timerWarned = {}; updateTimerDisplay(); const btn = document.getElementById('btn-timer-toggle'); btn.innerText = '시작'; btn.dataset.state = 'idle'; btn.classList.replace('bg-yellow-500', 'bg-blue-600'); btn.classList.replace('hover:bg-yellow-600', 'hover:bg-blue-700'); }
         function updateTimerDisplay() {
             const m = Math.floor(timerRemaining / 60); const s = timerRemaining % 60; const d = document.getElementById('timer-display'); if(d) d.innerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
             // 진행 막대: 남은 비율만큼, 절반 이하 노랑 · 20% 이하 빨강
@@ -1500,9 +1519,12 @@ function toggleBoardMode() {
 // 누락되었던 시계, 알람 함수 복원
 function updateTimetableHighlight(now) { 
     const cur = now.getHours() * 60 + now.getMinutes(); 
+    // 3.1.1: 끝나는 분(예: 12:10)은 그 시각에 시작하는 다음 칸이 없을 때만 그 교시 (예전엔 4교시와 점심이 1분 동안 함께 강조됐음)
+    const toM = v => { const [h, m] = String(v || '').split(':').map(Number); return h * 60 + m; };
+    const starts = new Set([...document.querySelectorAll('.timetable-slot')].map(el => toM(el.dataset.start)));
     document.querySelectorAll('.timetable-slot').forEach((el, i) => { 
         if(!el.dataset.start || !el.dataset.end) return; 
-        const [sh, sm] = el.dataset.start.split(':').map(Number); const [eh, em] = el.dataset.end.split(':').map(Number); const isA = cur >= (sh*60+sm) && cur <= (eh*60+em); 
+        const st = toM(el.dataset.start), en = toM(el.dataset.end); const isA = cur >= st && (cur < en || (cur === en && !starts.has(en))); 
         const sub = el.querySelector('.slot-subject'); const nEl = el.querySelector('.slot-name'); const tEl = el.querySelector('.slot-time'); 
         if(isA) { el.classList.remove('bg-slate-50', 'border-slate-200'); el.classList.add('bg-brand-500', 'border-brand-600', 'shadow-lg', 'scale-105', 'z-10'); nEl?.classList.remove('text-slate-800', 'text-slate-400'); nEl?.classList.add('text-white'); tEl?.classList.remove('text-slate-600', 'text-slate-400'); tEl?.classList.add('text-white'); if(sub) { sub.classList.remove('bg-white', 'text-slate-700'); sub.classList.add('ring-4','ring-white/50','scale-110', 'z-10', 'bg-white', 'text-brand-800'); } } 
         else { el.classList.remove('bg-brand-500', 'border-brand-600', 'shadow-lg', 'scale-105', 'z-10'); el.classList.add('bg-slate-50', 'border-slate-200'); nEl?.classList.remove('text-white'); tEl?.classList.remove('text-white'); if(!mutedPeriods[i]) { nEl?.classList.add('text-slate-800'); tEl?.classList.add('text-slate-600'); } else { nEl?.classList.add('text-slate-400'); tEl?.classList.add('text-slate-400'); } if(sub) { sub.classList.remove('ring-4','ring-white/50','scale-110', 'z-10', 'bg-white', 'text-brand-800'); } } 
@@ -1598,7 +1620,8 @@ function showAlarm(t, m, isLeave=false, tts=null, skipMelody=false) {
 }
 
 function closeAlarm() { const m = document.getElementById('modal-alarm'); if(m) m.classList.remove('active'); if(alarmCountdownIntervalId) clearInterval(alarmCountdownIntervalId); stopAudio(); if(window.speechSynthesis) window.speechSynthesis.cancel(); }
-function stopAudio() { isAudioPlaying = false; if(chimeTimeout) clearTimeout(chimeTimeout); currentOscillators.forEach(o => { try{o.stop();}catch(e){} }); currentOscillators = []; if(currentMp3Audio) { currentMp3Audio.pause(); currentMp3Audio.currentTime = 0; } }
+function stopPreview() { if (isPreviewPlaying) stopAudio(); }
+function stopAudio() { isPreviewPlaying = false; isAudioPlaying = false; if(chimeTimeout) clearTimeout(chimeTimeout); currentOscillators.forEach(o => { try{o.stop();}catch(e){} }); currentOscillators = []; if(currentMp3Audio) { currentMp3Audio.pause(); currentMp3Audio.currentTime = 0; } }
 
 // 유튜브 기능 완전 복원
 function openYouTube() {

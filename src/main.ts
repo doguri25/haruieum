@@ -80,6 +80,9 @@ declare global {
 window.lucide = lucideGlobal;
 window.smartboardHost = smartboardHost;
 window.renderVersionModal = renderVersionModal;
+// 3.1.1: '항상 위'는 켤 때마다 고르는 기능이라 화면 표시는 늘 '꺼짐'에서 시작함.
+// 초기화·백업 복원으로 화면만 다시 읽으면 창은 여전히 맨 위에 남아 표시와 어긋났음 → 시작할 때 창도 끔
+if (isTauri()) getCurrentWindow().setAlwaysOnTop(false).catch(() => {});
 
 // --- 화면 배율 ------------------------------------------------------------
 // responsive.css 가 html font-size 를 창 크기에 맞춰 정하면 16px 기준 비율을 --ui-scale 에 넣음

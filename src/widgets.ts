@@ -204,7 +204,7 @@ function initTimer() {
 function refresh(force = false) {
   if (!columnShown()) return;
   const today = new Date().toDateString();
-  if (isOn("lunch") && (force || lunchDay !== today)) void renderLunch();
+  if (isOn("lunch") && (force || lunchDay !== today)) void renderLunch(); // 오래된 급식은 lunch.ts 가 알아서 다시 받음
   if (isOn("events") && (force || eventsDay !== today)) void renderEvents();
   if (isOn("weather") && force) renderWeather();
   if (isOn("timer")) syncTimer();

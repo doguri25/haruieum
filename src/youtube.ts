@@ -12,7 +12,17 @@
 import { httpGetJson } from "./net";
 import { storage } from "./storage";
 
-const URL_RE = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|&v=)([^#&?]*).*/;
+// 3.1.1: 실시간·지난 실시간 공유 주소(youtube.com/live/ID)도
+const URL_RE = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|shorts\/|live\/|watch\?v=|&v=)([^#&?/]*).*/;
+/** 주소의 시작 시각(t=95, t=1m35s, start=30)을 초로. 없으면 0 */
+function startSeconds(url: string): number {
+  const m = url.match(/[?&#](?:t|start|time_continue)=([0-9hms]+)/i);
+  if (!m) return 0;
+  const v = m[1].toLowerCase();
+  if (/^\d+$/.test(v)) return parseInt(v, 10);
+  const p = v.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/);
+  return p ? (+(p[1] || 0)) * 3600 + (+(p[2] || 0)) * 60 + (+(p[3] || 0)) : 0;
+}
 const el = (id: string) => document.getElementById(id);
 
 interface Result { id: string; title: string; channel: string; thumb: string; published: string }
@@ -22,10 +32,10 @@ function setKey(k: string) { storage.setItem("smartBoardYoutubeKey", k.trim()); 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 const decodeEntities = (s: string) => { const t = document.createElement("textarea"); t.innerHTML = s; return t.value; };
 
-function showPlayer(videoId: string) {
+function showPlayer(videoId: string, start = 0) {
   const iframe = el("youtube-iframe") as HTMLIFrameElement | null;
   if (!iframe) return;
-  iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+  iframe.src = `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?autoplay=1&rel=0${start > 0 ? `&start=${start}` : ""}`;
   iframe.classList.remove("hidden");
   el("youtube-placeholder")?.classList.add("hidden");
   el("youtube-results")?.classList.add("hidden");
@@ -78,7 +88,7 @@ export async function search(query: string) {
   // 2.8.1: 검색할 때마다 번호를 매겨, 늦게 도착한 이전 검색 결과가 방금 튼 영상을 멈추거나 새 결과를 덮지 않게
   const my = ++searchSeq;
   const m = q.match(URL_RE);
-  if (m && m[2].length === 11) { showPlayer(m[2]); return; }
+  if (m && m[2].length === 11) { showPlayer(m[2], startSeconds(q)); return; }
   if (!getKey()) { toggleKeyPanel(true); setStatus("검색하려면 YouTube API 키가 필요합니다. 주소를 붙여넣으면 키 없이 바로 재생됩니다.", true); return; }
   setStatus("검색 중...");
   try {
@@ -123,4 +133,4 @@ declare global {
     youtubeUI: { search: (q: string) => Promise<void>; play: (id: string) => void; stop: () => void; toggleKeyPanel: (s?: boolean) => void; saveKey: () => void };
   }
 }
-window.youtubeUI = { search, play: showPlayer, stop: stopPlayer, toggleKeyPanel, saveKey: saveKeyFromPanel };
+window.youtubeUI = { search, play: (id: string) => showPlayer(id), stop: stopPlayer, toggleKeyPanel, saveKey: saveKeyFromPanel };

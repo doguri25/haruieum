@@ -98,9 +98,30 @@ function applyState(el: HTMLElement, opts: FloatingOptions) {
 /** 화면 밖으로 나간 부분이 있으면 안쪽으로 되돌립니다. (보이는 요소만) */
 function keepInside(el: HTMLElement, opts: FloatingOptions) {
   if (!isVisible(el)) return;
-  const r = el.getBoundingClientRect();
+  // 3.1.1: 나타나는 애니메이션(scale) 중에는 실제보다 작게 재지므로 끝난 다음에 다시 맞춤
+  const anims = el.getAnimations?.().filter((a) => a.playState === "running") ?? [];
+  if (anims.length) { Promise.all(anims.map((a) => a.finished)).then(() => keepInside(el, opts), () => {}); return; }
+  let r = el.getBoundingClientRect();
   if (r.width === 0) return;
   const vw = window.innerWidth, vh = window.innerHeight;
+  // 3.1.1: 화면보다 큰 창(해상도·배율이 바뀜, 크기 조절을 화면 밖까지 끔)은 화면에 맞게 줄임.
+  // 예전엔 위치만 0,0 으로 옮겨 닫기 버튼·크기 손잡이가 화면 밖에 남아 닫을 수도 줄일 수도 없었음
+  if (r.width > vw + 0.5 || r.height > vh + 0.5) {
+    const k = Math.min(vw / r.width, vh / r.height);
+    if (opts.mode === "box") {
+      const px = rootPx();
+      const w = Math.min(r.width, vw) / px, h = Math.min(r.height, vh) / px;
+      el.style.width = w + "rem"; el.style.height = h + "rem";
+      save(opts.id, { w, h });
+    } else if (opts.mode === "scale") {
+      const m = /scale\(([\d.]+)\)/.exec(el.style.transform);
+      const cur = m ? parseFloat(m[1]) : 1;
+      const next = Math.max(0.3, cur * k);
+      el.style.transform = `scale(${next})`;
+      save(opts.id, { s: next });
+    }
+    r = el.getBoundingClientRect();
+  }
   const left = clamp(r.left, 0, Math.max(0, vw - r.width));
   if (opts.anchor === "bottom-left") {
     const bottom = clamp(vh - r.bottom, 0, Math.max(0, vh - r.height));
@@ -148,18 +169,20 @@ function bringToFront(el: HTMLElement) {
 /** 머리글 드래그 */
 function attachDrag(el: HTMLElement, handle: HTMLElement, opts: FloatingOptions) {
   handle.classList.add("sb-float-handle");
-  let dragging = false, moved = false;
+  let dragging = false, moved = false, pid = -1;
   let startX = 0, startY = 0, startLeft = 0, startTop = 0, startBottom = 0;
   let width = 0, height = 0;
 
   handle.addEventListener("pointerdown", (e) => {
+    // 3.1.1: 끄는 중에 두 번째 손가락·손바닥이 닿으면 시작점이 바뀌어 창이 왔다 갔다 튀었음 → 처음 손가락만 따라감
+    if (dragging) return;
     // 2.8.1: 손가락으로 끌면 뒤따르는 click 이 없어 '방금 끌었음' 표시가 남아, 다음에 머리글의 닫기·저장 버튼을 누르면 무시됐음
     moved = false;
     // 머리글 안의 버튼·입력칸을 누른 경우는 드래그가 아님
     if ((e.target as HTMLElement).closest("button, input, select, textarea, a, [contenteditable]")) return;
     if (e.button !== 0) return;
     const r = el.getBoundingClientRect();
-    dragging = true; moved = false;
+    dragging = true; moved = false; pid = e.pointerId;
     interacting.add(opts.id);
     startX = e.clientX; startY = e.clientY;
     startLeft = r.left; startTop = r.top; startBottom = window.innerHeight - r.bottom;
@@ -170,7 +193,7 @@ function attachDrag(el: HTMLElement, handle: HTMLElement, opts: FloatingOptions)
   });
 
   handle.addEventListener("pointermove", (e) => {
-    if (!dragging) return;
+    if (!dragging || e.pointerId !== pid) return;
     const dx = e.clientX - startX, dy = e.clientY - startY;
     if (!moved && Math.hypot(dx, dy) < 4) return;
     moved = true;
@@ -188,7 +211,7 @@ function attachDrag(el: HTMLElement, handle: HTMLElement, opts: FloatingOptions)
   });
 
   const end = (e: PointerEvent) => {
-    if (!dragging) return;
+    if (!dragging || e.pointerId !== pid) return;
     dragging = false;
     interacting.delete(opts.id);
     try { handle.releasePointerCapture(e.pointerId); } catch { /* 무시 */ }
@@ -218,10 +241,10 @@ function attachResize(el: HTMLElement, opts: FloatingOptions) {
   grip.title = "크기 조절";
   el.appendChild(grip);
 
-  let resizing = false;
+  let resizing = false, pid = -1;
   grip.addEventListener("pointerdown", (e) => {
-    if (e.button !== 0) return;
-    resizing = true;
+    if (e.button !== 0 || resizing) return;
+    resizing = true; pid = e.pointerId;
     interacting.add(opts.id);
     bringToFront(el);
     grip.setPointerCapture(e.pointerId);
@@ -236,25 +259,30 @@ function attachResize(el: HTMLElement, opts: FloatingOptions) {
     }
   });
   grip.addEventListener("pointermove", (e) => {
-    if (!resizing) return;
+    if (!resizing || e.pointerId !== pid) return;
     const r = el.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight;
+    // 3.1.1: 화면 끝을 넘겨 끌어도 창은 화면 안까지만 커짐 (닫기 버튼·손잡이가 화면 밖으로 나가지 않게)
+    const x = Math.min(e.clientX, vw), y = Math.min(e.clientY, vh);
     if (opts.mode === "box") {
       const px = rootPx();
-      const w = Math.max(opts.minW ?? 14, (e.clientX - r.left) / px);
-      const h = Math.max(opts.minH ?? 10, (e.clientY - r.top) / px);
+      const w = Math.max(opts.minW ?? 14, (x - r.left) / px);
+      const h = Math.max(opts.minH ?? 10, (y - r.top) / px);
       el.style.width = w + "rem";
       el.style.height = h + "rem";
     } else if (opts.mode === "scale") {
       // 배율 = (고정된 모서리에서 손잡이까지의 실제 거리) / (원래 크기). 가로·세로 비율의 평균
       const naturalW = el.offsetWidth, naturalH = el.offsetHeight; // transform 적용 전 크기
-      const sx = (e.clientX - r.left) / naturalW;
-      const sy = (e.clientY - r.top) / naturalH;
-      const s = clamp((sx + sy) / 2, opts.minScale ?? 0.6, opts.maxScale ?? 2.5);
+      const sx = (x - r.left) / naturalW;
+      const sy = (y - r.top) / naturalH;
+      const fit = Math.min((vw - r.left) / naturalW, (vh - r.top) / naturalH);
+      const lo = opts.minScale ?? 0.6;
+      const s = clamp((sx + sy) / 2, lo, Math.max(lo, Math.min(opts.maxScale ?? 2.5, fit)));
       el.style.transform = `scale(${s})`;
     }
   });
   const end = (e: PointerEvent) => {
-    if (!resizing) return;
+    if (!resizing || e.pointerId !== pid) return;
     resizing = false;
     interacting.delete(opts.id);
     try { grip.releasePointerCapture(e.pointerId); } catch { /* 무시 */ }

@@ -12,9 +12,10 @@ const entry = log.find((e) => e.version === pkg.version) || log[0];
 const dirs = ["src-tauri/target/x86_64-pc-windows-gnu/release/bundle/nsis", "src-tauri/target/release/bundle/nsis"];
 const dir = dirs.find((d) => fs.existsSync(d));
 if (!dir) { console.error("빌드 결과(bundle/nsis)를 찾을 수 없습니다. 먼저 빌드하세요."); process.exit(1); }
-const exe = fs.readdirSync(dir).find((f) => f.endsWith("-setup.exe"));
+// 3.1.1: 지금 버전의 설치 파일만 (예전엔 폴더의 첫 setup.exe 를 써서, 옛 설치 파일이 남아 있으면 엉뚱한 버전을 올렸음)
+const exe = fs.readdirSync(dir).find((f) => f === `SmartBoard_${pkg.version}_x64-setup.exe`);
 const sig = exe && fs.existsSync(path.join(dir, exe + ".sig")) ? fs.readFileSync(path.join(dir, exe + ".sig"), "utf8").trim() : null;
-if (!exe || !sig) { console.error("setup.exe 또는 .sig 파일이 없습니다. (bundle.createUpdaterArtifacts 와 서명키 확인)"); process.exit(1); }
+if (!exe || !sig) { console.error(`SmartBoard_${pkg.version}_x64-setup.exe 또는 .sig 파일이 없습니다. (버전·bundle.createUpdaterArtifacts·서명키 확인)`); process.exit(1); }
 const latest = {
   version: pkg.version,
   notes: [entry.title, ...entry.items.map((i) => "- " + i)].filter(Boolean).join("\n"),
