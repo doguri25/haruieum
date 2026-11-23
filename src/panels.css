@@ -29,7 +29,7 @@
 }
 .sb-win-title {
   flex: 1; min-width: 0; margin: 0; display: flex; align-items: center; gap: 0.7rem;
-  font-size: 1.2rem; font-weight: 800; letter-spacing: -0.01em; line-height: 1.25; color: rgb(var(--sk-text-1));
+  font-size: calc(1.2rem * var(--sb-fs, 1)); font-weight: 800; letter-spacing: -0.01em; line-height: 1.25; color: rgb(var(--sk-text-1));
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .sb-win-ico, .sb-dialog-ico {
@@ -56,16 +56,16 @@
 .sb-win-act {
   display: inline-flex; align-items: center; gap: 0.4rem; min-height: 2.75rem; padding: 0 1rem;
   border: 0; border-radius: 0.9rem; background: rgb(var(--sk-surface-4) / 0.8); color: rgb(var(--sk-text-1));
-  font: inherit; font-size: 0.92rem; font-weight: 800; white-space: nowrap; cursor: pointer; transition: background 0.15s;
+  font: inherit; font-size: calc(0.92rem * var(--sb-fs, 1)); font-weight: 800; white-space: nowrap; cursor: pointer; transition: background 0.15s;
 }
 .sb-win-act:hover { background: rgb(var(--sk-surface-4)); }
 .sb-win-act svg { width: 1.1rem; height: 1.1rem; }
 .sb-win-act.hidden { display: none; }
 #modal-board-viewer .sb-win-act { background: var(--brand-600); color: #fff; }
 #modal-board-viewer .sb-win-act:hover { background: var(--brand-700); }
-.sb-win-chip { flex: none; font-size: 0.85rem; font-weight: 700; color: rgb(var(--sk-text-3)); background: rgb(var(--sk-surface-4) / 0.8); padding: 0.25rem 0.75rem; border-radius: 999px; }
+.sb-win-chip { flex: none; font-size: calc(0.85rem * var(--sb-fs, 1)); font-weight: 700; color: rgb(var(--sk-text-3)); background: rgb(var(--sk-surface-4) / 0.8); padding: 0.25rem 0.75rem; border-radius: 999px; }
 .sb-win-chip:empty { display: none; }
-.sb-win-check { flex: none; display: inline-flex; align-items: center; gap: 0.45rem; min-height: 2.75rem; padding: 0 0.6rem; font-size: 0.88rem; font-weight: 700; color: rgb(var(--sk-text-2)); cursor: pointer; user-select: none; }
+.sb-win-check { flex: none; display: inline-flex; align-items: center; gap: 0.45rem; min-height: 2.75rem; padding: 0 0.6rem; font-size: calc(0.88rem * var(--sb-fs, 1)); font-weight: 700; color: rgb(var(--sk-text-2)); cursor: pointer; user-select: none; }
 .sb-win-check input { width: 1.1rem; height: 1.1rem; accent-color: var(--brand-600); }
 :is(.sb-win-btn, .sb-win-x, .sb-win-act):focus-visible { outline: 3px solid var(--brand-400); outline-offset: 2px; }
 
@@ -101,8 +101,8 @@ body:has(.modal.active) .sb-floating { z-index: 45 !important; }
 
 /* ---------------------------------------------------------------- 떠 있는 도구 창 공통 */
 .sb-tool-body { display: flex; flex-direction: column; gap: 0.85rem; padding: 1.05rem 1.15rem 1.2rem; }
-.sb-btn-lg { min-height: 3.4rem; font-size: 1.15rem; border-radius: 1.1rem; }
-.sb-btn-sm { min-height: 2.4rem; padding: 0 0.85rem; font-size: 0.85rem; }
+.sb-btn-lg { min-height: 3.4rem; font-size: calc(1.15rem * var(--sb-fs, 1)); border-radius: 1.1rem; }
+.sb-btn-sm { min-height: 2.4rem; padding: 0 0.85rem; font-size: calc(0.85rem * var(--sb-fs, 1)); }
 .sb-check { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 2rem; cursor: pointer; }
 .sb-check input { width: 1.05rem; height: 1.05rem; accent-color: var(--brand-600); }
 
@@ -112,12 +112,12 @@ body:has(.modal.active) .sb-floating { z-index: 45 !important; }
 #floating-timer:has(#btn-timer-toggle[data-state="running"]) .sb-timer-display:not(.text-red-500) { color: var(--brand-700); }
 .sb-timer-track { height: 0.6rem; border-radius: 999px; background: rgb(var(--sk-surface-4)); overflow: hidden; }
 #timer-progress.bg-blue-500 { background: var(--brand-500) !important; }
-.sb-timer-warn { text-align: center; font-size: 1.1rem; font-weight: 800; color: #dc2626; }
-.sb-timer-warns { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.3rem 0.8rem; font-size: 0.88rem; font-weight: 700; color: rgb(var(--sk-text-3)); user-select: none; }
+.sb-timer-warn { text-align: center; font-size: calc(1.1rem * var(--sb-fs, 1)); font-weight: 800; color: #dc2626; }
+.sb-timer-warns { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.3rem 0.8rem; font-size: calc(0.88rem * var(--sb-fs, 1)); font-weight: 700; color: rgb(var(--sk-text-3)); user-select: none; }
 .sb-timer-add { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.4rem; }
 .sb-timer-add button, .sb-wt-add button {
   min-height: 2.75rem; border: 1px solid rgb(var(--sk-line)); border-radius: 0.85rem; background: rgb(var(--sk-surface));
-  color: rgb(var(--sk-text-2)); font: inherit; font-size: 0.95rem; font-weight: 800; cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
+  color: rgb(var(--sk-text-2)); font: inherit; font-size: calc(0.95rem * var(--sb-fs, 1)); font-weight: 800; cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
 }
 .sb-timer-add button:hover, .sb-wt-add button:hover { border-color: var(--brand-300); color: var(--brand-700); background: var(--brand-50); }
 .sb-timer-add button:active, .sb-wt-add button:active { transform: scale(0.96); }
@@ -129,14 +129,14 @@ body:has(.modal.active) .sb-floating { z-index: 45 !important; }
 .sb-noise-light { width: 2.7rem; height: 2.7rem; border-radius: 50%; transition: opacity 0.2s, box-shadow 0.2s; }
 .sb-noise-meter { position: relative; height: 1.1rem; border-radius: 999px; background: rgb(var(--sk-surface-4)); overflow: hidden; }
 .sb-noise-limit { position: absolute; top: 0; bottom: 0; left: 80%; width: 2px; background: #dc2626; }
-.sb-noise-row { display: flex; align-items: center; gap: 0.75rem; min-height: 2.9rem; padding: 0 0.9rem; border-radius: 0.95rem; background: rgb(var(--sk-surface-2)); font-size: 0.9rem; font-weight: 800; color: rgb(var(--sk-text-2)); cursor: pointer; }
+.sb-noise-row { display: flex; align-items: center; gap: 0.75rem; min-height: 2.9rem; padding: 0 0.9rem; border-radius: 0.95rem; background: rgb(var(--sk-surface-2)); font-size: calc(0.9rem * var(--sb-fs, 1)); font-weight: 800; color: rgb(var(--sk-text-2)); cursor: pointer; }
 .sb-noise-row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--brand-600); }
 .sb-noise-row b { width: 1.6rem; text-align: right; color: var(--brand-700); }
 .sb-noise-count { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding-top: 0.8rem; border-top: 1px solid rgb(var(--sk-line)); font-weight: 800; color: rgb(var(--sk-text-2)); }
-.sb-noise-count b { font-family: "Nunito", var(--sk-font); font-size: 2rem; color: #dc2626; margin: 0 0.15rem; vertical-align: -0.15em; }
+.sb-noise-count b { font-family: "Nunito", var(--sk-font); font-size: calc(2rem * var(--sb-fs, 1)); color: #dc2626; margin: 0 0.15rem; vertical-align: -0.15em; }
 .sb-noise-rules { display: flex; flex-direction: column; gap: 0.4rem; }
-.sb-noise-rule { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; font-weight: 700; color: rgb(var(--sk-text-3)); }
-.sb-noise-rule input { min-height: 2.5rem; padding: 0 0.6rem; border: 1px solid rgb(var(--sk-line-2)); border-radius: 0.75rem; background: rgb(var(--sk-surface)); color: rgb(var(--sk-text-1)); font: inherit; font-size: 0.9rem; font-weight: 800; }
+.sb-noise-rule { display: flex; align-items: center; gap: 0.4rem; font-size: calc(0.85rem * var(--sb-fs, 1)); font-weight: 700; color: rgb(var(--sk-text-3)); }
+.sb-noise-rule input { min-height: 2.5rem; padding: 0 0.6rem; border: 1px solid rgb(var(--sk-line-2)); border-radius: 0.75rem; background: rgb(var(--sk-surface)); color: rgb(var(--sk-text-1)); font: inherit; font-size: calc(0.9rem * var(--sb-fs, 1)); font-weight: 800; }
 .sb-noise-rule input[type="number"] { width: 3.5rem; text-align: center; color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
 .sb-noise-rule input[type="text"] { flex: 1; min-width: 0; }
 
@@ -154,8 +154,8 @@ body:has(.modal.active) .sb-floating { z-index: 45 !important; }
 .sb-note-size button { width: 2.6rem; height: 2.6rem; border: 0; padding: 0; border-radius: 0.85rem; background: transparent; color: #713f12; display: grid; place-items: center; cursor: pointer; }
 .sb-note-size button:hover { background: #fef3c7; }
 .sb-note-size svg { width: 1rem; height: 1rem; }
-#popup-note-size-display { width: 2rem; text-align: center; font-size: 0.95rem; font-weight: 800; color: #713f12; }
-.sb-note-bold { width: 2.6rem; height: 2.6rem; border: 0; border-radius: 0.85rem; font-family: "Nunito", sans-serif; font-size: 1.15rem; font-weight: 800; color: #713f12; box-shadow: 0 0 0 1px rgba(161, 98, 7, 0.22); cursor: pointer; }
+#popup-note-size-display { width: 2rem; text-align: center; font-size: calc(0.95rem * var(--sb-fs, 1)); font-weight: 800; color: #713f12; }
+.sb-note-bold { width: 2.6rem; height: 2.6rem; border: 0; border-radius: 0.85rem; font-family: "Nunito", sans-serif; font-size: calc(1.15rem * var(--sb-fs, 1)); font-weight: 800; color: #713f12; box-shadow: 0 0 0 1px rgba(161, 98, 7, 0.22); cursor: pointer; }
 .sb-note-bold.bg-white { background: #fff; }
 .sb-note-bold.bg-amber-300 { background: #fcd34d; }
 .sb-note-colors { display: flex; gap: 0.5rem; }
@@ -276,7 +276,7 @@ body:has(.modal.active) .sb-floating { z-index: 45 !important; }
 
 /* 떠 있는 도구 창의 처음 자리: 판서 서식 도구줄을 가리지 않게 조금 위로 (옮긴 뒤에는 옮긴 자리) */
 #floating-timer, #floating-noise-meter, #floating-popup-note { bottom: 13rem; }
-#btn-tool-activity { bottom: 12.75rem; }
+#btn-tool-activity { bottom: 12.75rem; left: calc(max(25.5rem, calc(25.5rem * (var(--sb-fs, 1) - 0.1))) + 3rem); }
 
 /* 설정 창의 시간·선택 칸이 좁은 화면에서 값이 잘렸음 */
 #input-leave-work-time, #select-leave-work-duration { min-width: 7.5rem; }
@@ -294,3 +294,31 @@ button[onclick="changeBgColor('skin')"], button[onclick="changePanelColor('skin'
 :is([data-skin="dark"],[data-skin="ocean"],[data-skin="graphite"]) .modal .bg-white:is(.text-rose-600,.text-rose-700,.text-rose-800) { color: #fda4af; }
 :is([data-skin="dark"],[data-skin="ocean"],[data-skin="graphite"]) .modal .bg-white:is(.text-brand-600,.text-brand-700,.text-brand-800) { color: var(--brand-300); }
 :is([data-skin="dark"],[data-skin="ocean"],[data-skin="graphite"]) .modal .bg-white:is(.text-emerald-600,.text-emerald-700,.text-emerald-800) { color: #6ee7b7; }
+
+/* ============================================================
+   3.2.0 글자 크기(--sb-fs)를 키웠을 때 좁아지는 곳
+   ============================================================ */
+#modal-saved-list > .sb-win { width: min(calc(31.25rem * var(--sb-fs, 1)), 94vw); }
+/* 글자를 키우면 시간표 칸(교시·시간·과목)이 한 줄에 다 들어가게 왼쪽 칸을 조금 넓힘 (보통은 그대로) */
+.sb-sidebar { flex-basis: max(25.5rem, calc(25.5rem * (var(--sb-fs, 1) - 0.1))); }
+#activity-desc { white-space: nowrap; }
+
+/* 글자 크기 고르기 (빠른 설정 · 환경 설정) — src/font-scale.ts */
+.sb-qs-fs { display: flex; align-items: center; gap: 0.7rem; padding: 0.25rem 0.35rem; }
+.sb-qs-fs .sb-fs-seg { margin-left: auto; }
+.sb-fs-seg { display: inline-flex; gap: 0.2rem; padding: 0.25rem; border-radius: 999px; background: rgb(var(--sk-surface-3)); }
+#sb-quick .sb-fs-seg { background: var(--qs-tile); }
+.sb-fs-seg button {
+  min-height: 2.5rem; padding: 0 0.85rem; border: 0; border-radius: 999px; background: transparent; color: inherit;
+  font: inherit; font-size: calc(0.88rem * var(--sb-fs, 1)); font-weight: 800; white-space: nowrap; cursor: pointer; transition: background-color 0.15s, color 0.15s;
+}
+.sb-fs-seg button:hover { background: rgb(var(--sk-surface-4) / 0.8); }
+#sb-quick .sb-fs-seg button:hover { background: var(--qs-tile-hover); }
+.sb-fs-seg button[aria-pressed="true"] { background: var(--brand-600); color: #fff; }
+.sb-fs-seg button:focus-visible { outline: 3px solid var(--brand-400); outline-offset: 2px; }
+.sb-fs-seg-lg { display: flex; width: 100%; box-sizing: border-box; background: rgb(var(--sk-surface-3)); }
+.sb-fs-seg-lg button { min-width: 0; }
+.sb-fs-seg-lg button { flex: 1; min-height: 3rem; }
+.sb-fs-seg-lg button[data-fs-set="normal"] { font-size: calc(0.9rem * var(--sb-fs, 1)); }
+.sb-fs-seg-lg button[data-fs-set="large"] { font-size: calc(1rem * var(--sb-fs, 1)); }
+.sb-fs-seg-lg button[data-fs-set="xlarge"] { font-size: calc(1.1rem * var(--sb-fs, 1)); }

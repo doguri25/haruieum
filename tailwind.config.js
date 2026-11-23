@@ -2,6 +2,7 @@
 // 회색 계열 색·모서리·그림자는 src/skins.css 의 디자인 테마 변수에 연결됩니다.
 // (예: bg-white → rgb(var(--sk-surface)), text-slate-800 → rgb(var(--sk-text-1)))
 const v = (name) => `rgb(var(${name}) / <alpha-value>)`;
+const fs = (rem) => `calc(${rem}rem * var(--sb-fs, 1))`;
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -31,6 +32,22 @@ export default {
       slate: { ...theme("colors.slate"), 100: v("--sk-line"), 200: v("--sk-line"), 300: v("--sk-line-2"), 400: v("--sk-line-3"), 700: v("--sk-line-3") },
     }),
     ringColor: ({ theme }) => ({ ...theme("colors"), DEFAULT: "var(--brand-500)", white: v("--sk-surface") }),
+    // 3.2.0 글자 크기 배율(--sb-fs, src/font-scale.ts): text-xs ~ text-4xl 은 배율을 곱함. 5xl 부터(큰 숫자)는 그대로
+    fontSize: {
+      xs: [fs(0.75), { lineHeight: fs(1) }],
+      sm: [fs(0.875), { lineHeight: fs(1.25) }],
+      base: [fs(1), { lineHeight: fs(1.5) }],
+      lg: [fs(1.125), { lineHeight: fs(1.75) }],
+      xl: [fs(1.25), { lineHeight: fs(1.75) }],
+      "2xl": [fs(1.5), { lineHeight: fs(2) }],
+      "3xl": [fs(1.875), { lineHeight: fs(2.25) }],
+      "4xl": [fs(2.25), { lineHeight: fs(2.5) }],
+      "5xl": ["3rem", { lineHeight: "1" }],
+      "6xl": ["3.75rem", { lineHeight: "1" }],
+      "7xl": ["4.5rem", { lineHeight: "1" }],
+      "8xl": ["6rem", { lineHeight: "1" }],
+      "9xl": ["8rem", { lineHeight: "1" }],
+    },
     extend: {
       colors: {
         brand: {

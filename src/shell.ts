@@ -84,14 +84,8 @@ function renderStatus() {
   const set = (id: string, v: string) => { const e = $(id); if (e && e.textContent !== v) e.textContent = v; };
   set("sb-live-title", st.title);
   set("sb-live-sub", st.sub);
-  set("sb-now-title", st.title);
-  set("sb-now-remain", st.sub);
-  const badge = $("sb-now-badge");
-  if (badge) { badge.textContent = st.badge; badge.hidden = false; badge.dataset.live = String(st.live); }
   const arc = $("sb-live-arc");
   if (arc) arc.setAttribute("stroke-dasharray", `${(56.55 * st.progress).toFixed(2)} 56.55`);
-  const bar = $("sb-now-progress");
-  if (bar) bar.style.width = (st.progress * 100).toFixed(1) + "%";
   $("sb-live")?.classList.toggle("is-live", st.live);
   document.body.dataset.classState = st.live ? "live" : "idle";
 }

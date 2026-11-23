@@ -18,6 +18,7 @@ import { initMotion } from "./motion";
 import { initSkins, migrateToV3 } from "./skins";
 import { initShell } from "./shell";
 import { initWidgets } from "./widgets";
+import { initFontScale } from "./font-scale";
 import { initUpdater } from "./updater";
 import { renderVersionModal } from "./version";
 import "./board-editor"; // window.boardEditor (legacy-app.js 와 HTML 버튼이 사용)
@@ -43,6 +44,7 @@ import "@fontsource/nunito/400.css";
 import "@fontsource/nunito/600.css";
 import "@fontsource/nunito/700.css";
 import "@fontsource/nunito/800.css";
+import "@fontsource/nunito/900.css"; // 3.2.0 시계 숫자 (둥글고 아주 굵게)
 import "./tailwind.css";
 import "./responsive.css";
 import "./floating.css";
@@ -157,6 +159,7 @@ async function boot() {
   if (document.readyState === "loading") {
     await new Promise<void>((r) => document.addEventListener("DOMContentLoaded", () => r(), { once: true }));
   }
+  initFontScale();      // 3.2.0 글자 크기 (다른 화면을 그리기 전에)
   migrateToV3();        // 3.0.0 처음 실행: 새 디자인으로 (legacy 가 설정을 읽기 전에)
   initSkins();          // 디자인 테마 (legacy 가 바탕색을 덧입히기 전에)
   startLegacyApp();

@@ -447,4 +447,4 @@ input[type="range"] { background: transparent; }
 .skin-card.active { border-color: var(--brand-500); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-500) 25%, transparent); }
 .skin-card .swatch { height: 2.75rem; border-radius: 0.5rem; display: flex; align-items: flex-end; gap: 3px; padding: 4px; margin-bottom: 0.35rem; }
 .skin-card .swatch span { flex: 1; height: 55%; border-radius: 3px; }
-.skin-card .name { font-size: 0.8rem; font-weight: 700; color: rgb(var(--sk-text-2)); }
+.skin-card .name { font-size: 0.8rem; letter-spacing: -0.02em; font-weight: 700; color: rgb(var(--sk-text-2)); }

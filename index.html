@@ -112,6 +112,15 @@
             <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.5" class="cursor-pointer">
             <span id="volume-val" class="sb-qs-val tabular-nums">50%</span>
         </div>
+        <div class="sb-qs-fs">
+            <i data-lucide="a-large-small" class="w-5 h-5 shrink-0"></i>
+            <span class="sb-qs-label">글자 크기</span>
+            <div class="sb-fs-seg" role="group" aria-label="글자 크기">
+                <button type="button" data-fs-set="normal" aria-pressed="false">보통</button>
+                <button type="button" data-fs-set="large" aria-pressed="true">크게</button>
+                <button type="button" data-fs-set="xlarge" aria-pressed="false">아주 크게</button>
+            </div>
+        </div>
         <div class="sb-qs-grid">
             <button type="button" id="qs-bell" class="sb-qs-tile" aria-pressed="true" onclick="window.shell.toggleBell()"><i data-lucide="bell-ring" class="w-5 h-5 shrink-0"></i><span class="sb-qs-txt"><b>수업 종</b><small id="qs-bell-state">켜짐</small></span></button>
             <button type="button" id="btn-always-on-top" class="sb-qs-tile" aria-pressed="false" onclick="toggleAlwaysOnTop()"><i data-lucide="pin" class="w-5 h-5 shrink-0"></i><span class="sb-qs-txt"><b>항상 위</b><small id="qs-pin-state">꺼짐</small></span></button>
@@ -135,17 +144,10 @@
         <div id="main-layout-container" class="sb-main">
             <!-- 왼쪽: 지금 카드 + 시간표 -->
             <aside id="sb-sidebar" class="sb-sidebar">
-                <section class="sb-card sb-now panel-bg" aria-label="지금">
-                    <div class="sb-now-top">
-                        <button type="button" id="current-date-text" onclick="openCalendar()" class="sb-now-date" title="달력 보기"></button>
-                        <span id="sb-now-badge" class="sb-now-badge" hidden></span>
-                    </div>
+                <!-- 3.2.0: 시계 카드는 날짜와 시간만 크게 (수업 상태는 위쪽 가운데 알약에) -->
+                <section class="sb-card sb-now panel-bg" aria-label="날짜와 시간">
+                    <button type="button" id="current-date-text" onclick="openCalendar()" class="sb-now-date" title="달력 보기"></button>
                     <div id="current-time-text" onclick="openTimeSettingsModal()" class="sb-now-clock" title="시간 및 지정 알람 설정">00:00:00</div>
-                    <div class="sb-now-row">
-                        <span id="sb-now-title" class="sb-now-title"></span>
-                        <span id="sb-now-remain" class="sb-now-remain"></span>
-                    </div>
-                    <div class="sb-now-bar" aria-hidden="true"><div id="sb-now-progress"></div></div>
                 </section>
 
                 <section class="sb-card sb-tt panel-bg" aria-label="오늘의 시간표">
@@ -677,6 +679,16 @@
                         <h3 class="text-lg font-bold text-slate-800 mb-1">디자인 테마</h3>
                         <p class="text-xs text-slate-500 mb-3">화면 전체의 분위기(바탕·판·글자색·모서리)를 바꿉니다. 아래 색상 설정은 그 위에 덧입혀집니다.</p>
                         <div id="skin-cards" class="grid grid-cols-4 gap-2"></div>
+                    </div>
+
+                    <div id="settings-fontscale" class="border-t border-slate-200 pt-5">
+                        <h3 class="text-lg font-bold text-slate-800 mb-1">글자 크기</h3>
+                        <p class="text-xs text-slate-500 mb-3">전자칠판에서 멀리서도 잘 보이게 앱 전체의 글자 크기를 정합니다 (기본은 '크게'). 판서·알림장 글자 크기는 판서 도구줄에서 따로 정해요.</p>
+                        <div class="sb-fs-seg sb-fs-seg-lg" role="group" aria-label="글자 크기">
+                            <button type="button" data-fs-set="normal" aria-pressed="false">보통</button>
+                            <button type="button" data-fs-set="large" aria-pressed="true">크게</button>
+                            <button type="button" data-fs-set="xlarge" aria-pressed="false">아주 크게</button>
+                        </div>
                     </div>
 
                     <div id="settings-widgets" class="border-t border-slate-200 pt-5">
