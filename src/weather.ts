@@ -227,6 +227,15 @@ function setHeader(iconHtml: string, text: string) {
 }
 
 let lastWeather: Weather | null = null, lastDust: Dust | null = null, lastError = "";
+// 3.1.1: 받기에 실패하면 1·2·5·10분 뒤 다시 (예전엔 30분 주기까지 기다려, 켜자마자 인터넷이 안 잡힌 날은 30분 동안 '오류')
+const RETRY_MIN = [1, 2, 5, 10];
+let retryN = 0, retryTimer: number | undefined;
+function scheduleRetry(failed: boolean) {
+  window.clearTimeout(retryTimer);
+  if (!failed) { retryN = 0; return; }
+  if (retryN < RETRY_MIN.length) retryTimer = window.setTimeout(() => void refreshWeather(), RETRY_MIN[retryN++] * 60_000);
+}
+window.addEventListener("online", () => { if (lastError && lastError !== "no-key") { retryN = 0; void refreshWeather(); } });
 
 export async function refreshWeather() {
   const r = getRegion();
@@ -256,6 +265,7 @@ export async function refreshWeather() {
   if (dc) dc.className = `flex items-center text-lg font-bold ${dg.color}`;
   if (dt) dt.innerText = lastDust ? `미세먼지: ${dg.text}` : "미세먼지: 정보없음";
   renderModal(r); icons(); notify();
+  scheduleRetry(!lastWeather);
 }
 // 3.1.0: 첫 화면 날씨 위젯(src/widgets.ts)이 새 값을 받아 가도록 알림
 const notify = () => document.dispatchEvent(new CustomEvent("sb:weather"));
@@ -315,7 +325,7 @@ function renderModal(r: Region) {
       <i data-lucide="${info.icon}" class="w-20 h-20 ${info.color}"></i>
     </div>
     <div class="grid grid-cols-2 gap-4 mb-6 shrink-0">
-      <div class="${dg.bg} p-4 rounded-xl border ${dg.border} flex flex-col items-center shadow-sm"><i data-lucide="wind" class="${dg.color} w-8 h-8 mb-2"></i><span class="text-base font-bold">미세먼지 (PM10)</span><span class="text-2xl font-bold ${dg.color}">${dg.text}</span><span class="text-xs text-slate-400">${lastDust?.pm10 ?? "-"}㎍/㎥ · ${lastDust?.station ?? ""}</span></div>
+      <div class="${dg.bg} p-4 rounded-xl border ${dg.border} flex flex-col items-center shadow-sm"><i data-lucide="wind" class="${dg.color} w-8 h-8 mb-2"></i><span class="text-base font-bold">미세먼지 (PM10)</span><span class="text-2xl font-bold ${dg.color}">${dg.text}</span><span class="text-xs text-slate-400">${lastDust?.pm10 ?? "-"}㎍/㎥ · ${escHtml(String(lastDust?.station ?? ""))}</span></div>
       <div class="${dg25.bg} p-4 rounded-xl border ${dg25.border} flex flex-col items-center shadow-sm"><i data-lucide="haze" class="${dg25.color} w-8 h-8 mb-2"></i><span class="text-base font-bold">초미세먼지 (PM2.5)</span><span class="text-2xl font-bold ${dg25.color}">${dg25.text}</span><span class="text-xs text-slate-400">${lastDust?.pm25 ?? "-"}㎍/㎥</span></div>
     </div>
     <div class="mb-2 font-bold text-slate-600">시간별 예보</div>

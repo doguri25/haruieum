@@ -123,7 +123,8 @@ body.sb-bell-off .sb-qs-ind-bell::after { content: ""; position: absolute; left:
 .sb-board { flex: 1 1 auto; min-width: 0; min-height: 0; }
 .sb-widgets { flex: 0 0 19rem; min-width: 0; min-height: 0; display: none; flex-direction: column; gap: 1rem; overflow-y: auto; padding-bottom: 0.25rem; }
 /* 3.1.0: 화면 배율(150% 등)로 CSS 너비가 좁아도 위젯이 보이게 1500px → 1100px (rem 이 창에 맞춰 줄어들어 비율은 같음) */
-@media (min-width: 1100px) { .sb-widgets { display: flex; } }
+/* 3.1.1: 1100px → 1040px — 1080p 화면을 175%로 쓰면 CSS 너비가 1097px 이라 위젯 칸이 숨겨졌음 */
+@media (min-width: 1040px) { .sb-widgets { display: flex; } }
 .sb-widgets[hidden], .sb-widget[hidden] { display: none !important; }
 
 /* 판(카드) 공통 */

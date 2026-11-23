@@ -227,7 +227,10 @@ function renderEditor() {
       <button type="button" class="sb-switch" role="switch" aria-checked="${enabled}" aria-label="${c.name} 보이기" data-toggle><span></span></button>
     </li>`;
   }).join("");
-  const n = $("sb-we-count"); if (n) n.textContent = on.length ? `${on.length}개 켬` : "모두 끔 — 오른쪽 칸이 숨겨져요";
+  // 3.1.1: 창이 좁아(화면 배율 175%·200% 등) 위젯 칸 자체가 숨겨진 경우에도 알려 줌 — 예전엔 켜도 아무것도 안 나와 이유를 몰랐음
+  const col = $("sb-widgets");
+  const narrow = on.length > 0 && !!col && !col.hidden && getComputedStyle(col).display === "none" && !document.body.classList.contains("sb-focus");
+  const n = $("sb-we-count"); if (n) n.textContent = !on.length ? "모두 끔 — 오른쪽 칸이 숨겨져요" : narrow ? `${on.length}개 켬 — 지금은 창이 좁아 위젯 칸이 숨겨져 있어요` : `${on.length}개 켬`;
   icons();
 }
 function initEditor() {
@@ -246,7 +249,11 @@ function initEditor() {
     // 다시 그린 뒤에도 같은 버튼에 초점이 남게 (터치펜·키보드로 여러 번 누를 때)
     const sel = b.hasAttribute("data-toggle") ? "[data-toggle]" : `[data-move="${b.dataset.move}"]`;
     const again = document.querySelector<HTMLButtonElement>(`#sb-we-list [data-id="${id}"] ${sel}`);
-    if (again && !again.disabled) again.focus(); else document.querySelector<HTMLElement>(`#sb-we-list [data-id="${id}"] [data-toggle]`)?.focus();
+    // 3.1.1: 맨 위·아래에 닿아 화살표가 꺼지면 반대쪽 화살표로 (예전엔 켜기 스위치로 가서, Enter 를 한 번 더 누르면 위젯이 꺼졌음)
+    const opposite = b.dataset.move ? document.querySelector<HTMLButtonElement>(`#sb-we-list [data-id="${id}"] [data-move="${-Number(b.dataset.move)}"]`) : null;
+    if (again && !again.disabled) again.focus();
+    else if (opposite && !opposite.disabled) opposite.focus();
+    else document.querySelector<HTMLElement>(`#sb-we-list [data-id="${id}"] [data-toggle]`)?.focus();
   });
 }
 export function openEditor() {

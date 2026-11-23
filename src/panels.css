@@ -230,3 +230,12 @@ body:has(.modal.active) .sb-floating { z-index: 45 !important; }
 
 /* 떠 있는 창의 크기 손잡이: 3.1.0 의 둥근 모서리(약 1.85rem)에 대부분 잘려 누르기 어려웠음 → 크게 해서 안쪽 띠가 남게 */
 .sb-floating .sb-resize-grip { width: 2.5rem; height: 2.5rem; }
+
+/* 소음 측정기 경고 깜빡임(bg-red-100)이 창 바탕색에 가려 보이지 않던 문제 */
+#floating-noise-meter.bg-red-100 { background: #fee2e2; }
+#floating-noise-meter.bg-red-100 .sb-win-head { background: #fecaca; }
+[data-skin="dark"] #floating-noise-meter.bg-red-100 { background: #4c1d1d; }
+[data-skin="dark"] #floating-noise-meter.bg-red-100 .sb-win-head { background: #5f2424; }
+
+/* 지금 교시의 과목 칸: 어두운 테마(다크·바다·그래파이트)에선 bg-white 가 어두운 판넬색이라 진한 과목 글씨가 안 보였음 → 밝은 칸으로 */
+.timetable-slot.bg-brand-500 .slot-subject.bg-white { background-color: #ffffff !important; }

@@ -1534,7 +1534,6 @@ function updateTimetableHighlight(now) {
 function checkAlarms(now) {
     const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
     if (lastCheckedMinuteStr === timeStr) return; 
-    let alarmTriggered = false;
     const dateKey = now.getDate();
     const currentKey = `${dateKey}-${timeStr}`;
     
@@ -1543,19 +1542,12 @@ function checkAlarms(now) {
     const holidayNow = window.schoolCalendar ? window.schoolCalendar.holidayOn(now) : null;
     const schoolOff = dowNow === 0 || dowNow === 6 || !!holidayNow;
 
-    if (!schoolOff && isLeaveWorkEnabled && timeStr === leaveWorkTime && lastAlarmKey !== `leave-${currentKey}`) {
-        if (leaveWorkPopupEnabled) { showAlarm("퇴근 시간 안내", "선생님, 오늘 하루도 수고 많으셨습니다!", true, "선생님, 퇴근 시간입니다. 수고하셨습니다.", true); } 
-        else { playTTS("선생님, 퇴근 시간입니다. 수고하셨습니다."); }
-        lastAlarmKey = `leave-${currentKey}`; alarmTriggered = true;
-    }
-
-    if (!alarmTriggered && customAlarmEnabled && timeStr === customAlarmTime && lastAlarmKey !== `custom-${currentKey}`) {
-        showAlarm("지정 시간 알람", customAlarmMessage, false, customAlarmMessage, false);
-        lastAlarmKey = `custom-${currentKey}`; alarmTriggered = true;
-        if (customAlarmFreq === 'once') { customAlarmEnabled = false; storage.setItem('smartBoardCustomAlarmEnabled', JSON.stringify(false)); const tel = document.getElementById('toggle-custom-alarm'); if(tel) tel.checked = false; }
-    }
-
-    if (!alarmTriggered && isAlarmPopupEnabled) {
+    // 3.1.1: 수업 종이 먼저. 같은 분의 퇴근·지정 알람은 종 알림에 덧붙임
+    //        (예전엔 지정 알람(예: 10:30 우유)이나 퇴근 시각이 종과 겹치면 그날 그 종이 아예 울리지 않았음)
+    const leaveDue = !schoolOff && isLeaveWorkEnabled && timeStr === leaveWorkTime && lastAlarmKey !== `leave-${currentKey}`;
+    const customDue = customAlarmEnabled && timeStr === customAlarmTime && lastAlarmKey !== `custom-${currentKey}`;
+    let pendingAlarm = null;
+    if (isAlarmPopupEnabled) {
         const dow = now.getDay(); 
         const todayStr = now.toLocaleDateString();
         if(dailyOverride.date !== todayStr) { dailyOverride = { date: todayStr, overrides: {} }; storage.removeItem('smartBoardDailyOverride'); }
@@ -1563,7 +1555,6 @@ function checkAlarms(now) {
         for (let idx in dailyOverride.overrides) { sch[idx] = dailyOverride.overrides[idx]; }
         let lp = -1; for(let i = sch.length - 1; i >= 0; i--) { if(sch[i] && sch[i].trim() !== '') { lp = i; break; } }
         if (lp === -1) lp = timeSlots.length - 1; 
-        let pendingAlarm = null;
         // 수업이 하나도 없는 날(주말 등)에는 점심 칸만으로 종이 울리지 않게 (예전엔 빈 점심 칸을 '점심'으로 채워 토요일에도 울렸음)
         const hasClass = sch.some((v, i) => v && v.trim() !== '' && v.trim() !== '점심' && timeSlots[i] && timeSlots[i].name !== '점심');
 
@@ -1594,7 +1585,24 @@ function checkAlarms(now) {
                 }
             }
         }
-        if (pendingAlarm) { showAlarm(pendingAlarm.title, pendingAlarm.msg, false, pendingAlarm.tts, pendingAlarm.skip); lastAlarmKey = pendingAlarm.key; }
+    }
+    const customDone = () => { if (customAlarmFreq === 'once') { customAlarmEnabled = false; storage.setItem('smartBoardCustomAlarmEnabled', JSON.stringify(false)); const tel = document.getElementById('toggle-custom-alarm'); if(tel) tel.checked = false; } };
+    if (pendingAlarm) {
+        let msg = pendingAlarm.msg, tts = pendingAlarm.tts || pendingAlarm.msg;
+        if (leaveDue) { if (leaveWorkPopupEnabled) msg += '\n선생님, 오늘 하루도 수고 많으셨습니다!'; tts += ' 선생님, 퇴근 시간입니다. 수고하셨습니다.'; }
+        if (customDue) { msg += '\n⏰ ' + customAlarmMessage; tts += ' ' + customAlarmMessage; customDone(); }
+        showAlarm(pendingAlarm.title, msg, false, tts, pendingAlarm.skip); lastAlarmKey = pendingAlarm.key;
+    } else if (leaveDue) {
+        // 같은 분의 지정 알람은 퇴근 안내에 덧붙임 (예전엔 지정 알람이 사라지고 '한 번' 알람은 꺼지지 않아 다음 날 울렸음)
+        const cm = customDue ? customAlarmMessage : '';
+        if (customDue) customDone();
+        if (leaveWorkPopupEnabled) { showAlarm("퇴근 시간 안내", "선생님, 오늘 하루도 수고 많으셨습니다!" + (cm ? '\n⏰ ' + cm : ''), true, "선생님, 퇴근 시간입니다. 수고하셨습니다." + (cm ? ' ' + cm : ''), true); }
+        else if (cm) { showAlarm("지정 시간 알람", cm, false, "선생님, 퇴근 시간입니다. 수고하셨습니다. " + cm, true); }
+        else { playTTS("선생님, 퇴근 시간입니다. 수고하셨습니다."); }
+        lastAlarmKey = `leave-${currentKey}`;
+    } else if (customDue) {
+        showAlarm("지정 시간 알람", customAlarmMessage, false, customAlarmMessage, false);
+        lastAlarmKey = `custom-${currentKey}`; customDone();
     }
     lastCheckedMinuteStr = timeStr; 
 }

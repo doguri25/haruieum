@@ -149,16 +149,18 @@ export async function toggleAutostart() {
 // ---------------------------------------------------------------- 모든 도구 모아 보기
 interface Tool { key: string; label: string; icon: string; tone: string; words: string; run: () => void }
 const openSettingsAt = (id: string) => { call("openSettingsModal"); window.setTimeout(() => $(id)?.scrollIntoView({ block: "start", behavior: "smooth" }), 120); };
+// 3.1.1: 모아 보기에선 떠 있는 창이 가려져 열려 있는지 안 보이므로, 누르면 '열기'만 (예전엔 열려 있던 타이머·노트를 닫아 버렸음)
+const openOnly = (elId: string, fn: string) => () => { if ($(elId)?.classList.contains("hidden") ?? true) call(fn); };
 const TOOLS: Tool[] = [
   { key: "picker", label: "뽑기", icon: "dices", tone: "plum", words: "뽑기 랜덤 학생 번호 이름 발표 순서 추첨", run: () => call("pickRandomNumber") },
-  { key: "timer", label: "타이머", icon: "timer", tone: "orange", words: "타이머 시간 초시계 스톱워치 미리 알림", run: () => call("toggleTimerPopup") },
-  { key: "noise", label: "소음 측정", icon: "audio-lines", tone: "teal", words: "소음 측정 조용 소리 마이크 시끄러움", run: () => call("toggleNoiseMeter") },
+  { key: "timer", label: "타이머", icon: "timer", tone: "orange", words: "타이머 시간 초시계 스톱워치 미리 알림", run: openOnly("floating-timer", "toggleTimerPopup") },
+  { key: "noise", label: "소음 측정", icon: "audio-lines", tone: "teal", words: "소음 측정 조용 소리 마이크 시끄러움", run: openOnly("floating-noise-meter", "toggleNoiseMeter") },
   { key: "attention", label: "주목!", icon: "megaphone", tone: "amber", words: "주목 집중 박수 신호 종", run: () => call("playAttentionBell") },
   { key: "youtube", label: "유튜브", icon: "youtube", tone: "red", words: "유튜브 영상 동영상 노래 youtube", run: () => call("openYouTube") },
   { key: "tinkerbell", label: "팅커벨", icon: "sparkles", tone: "violet", words: "팅커벨 사이트 학습 퀴즈", run: () => call("openExternalSite", "tinkerbell") },
   { key: "iscream", label: "아이스크림", icon: "ice-cream-cone", tone: "pink", words: "아이스크림 사이트 학습 수업자료", run: () => call("openExternalSite", "iscream") },
   { key: "lunch", label: "급식", icon: "utensils", tone: "green", words: "급식 점심 식단 메뉴 알레르기 칼로리 학교", run: () => call("openLunchModal") },
-  { key: "popupnote", label: "팝업 노트", icon: "sticky-note", tone: "gold", words: "팝업 노트 메모 쪽지", run: () => call("togglePopupNote") },
+  { key: "popupnote", label: "팝업 노트", icon: "sticky-note", tone: "gold", words: "팝업 노트 메모 쪽지", run: openOnly("floating-popup-note", "togglePopupNote") },
   { key: "qr", label: "QR 코드", icon: "qr-code", tone: "slate", words: "qr 큐알 코드 링크 주소", run: () => W.qr?.open?.() },
   { key: "weather", label: "날씨", icon: "sun", tone: "sky", words: "날씨 미세먼지 기온 비 눈 지역", run: () => call("openWeather") },
   { key: "calendar", label: "학사일정", icon: "calendar-days", tone: "rose", words: "학사일정 달력 휴일 방학 행사 쉬는 날", run: () => call("openCalendar") },
@@ -179,7 +181,9 @@ const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
 function htmlLines(html: string, max = 4): string[] {
   if (!html) return [];
   const doc = new DOMParser().parseFromString(html, "text/html");
-  const blocks = Array.from(doc.body.querySelectorAll("p, li, h1, h2, h3, td"));
+  // 3.1.1: <li><p>…</p></li>·<td><p> 처럼 겹친 것은 안쪽만 (예전엔 목록·표 줄이 두 번씩 나왔음)
+  const SEL = "p, li, h1, h2, h3, td";
+  const blocks = Array.from(doc.body.querySelectorAll(SEL)).filter((b) => !b.querySelector(SEL));
   const lines = (blocks.length ? blocks.map((b) => b.textContent || "") : [doc.body.textContent || ""])
     .map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean);
   return lines.slice(0, max);
@@ -288,6 +292,7 @@ export function toggleFocus(force?: boolean) {
   if (!on) document.body.classList.remove("sb-dock-open");
   $("btn-focus")?.setAttribute("aria-pressed", String(on));
   $("sb-dock-peek")?.setAttribute("aria-expanded", "false");
+  const peekLbl = $("sb-dock-peek")?.querySelector("span"); if (peekLbl) peekLbl.textContent = "도구 모음"; // 3.1.1: 다시 들어와도 '숨기기'로 남지 않게
   // 판 크기가 바뀌었으므로 사진 도구 위치·떠 있는 창·Dock 맞춤을 다시
   window.setTimeout(() => window.dispatchEvent(new Event("resize")), 50);
 }
