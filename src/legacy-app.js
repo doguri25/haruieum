@@ -1459,10 +1459,12 @@ function currentEditorKey() {
 }
 
 let boardSwitching = false;
+let boardSwitchTo = null; // 3.1.1: 전환 중일 때 어디로 가는 중인지
 /** 3.0.0: 지금 보이는 판 ('board' 판서 / 'notice' 알림장) — 상단 전환 버튼이 씀 */
 function getBoardMode() { return currentBoardMode; }
 /** 3.0.0: 전환 중이면 false (전환 효과가 끝난 뒤 다시 눌러야 함) */
-function setBoardMode(mode) { if (mode === currentBoardMode) return true; if (boardSwitching) return false; toggleBoardMode(); return true; }
+// 3.1.1: 전환 효과 중에는 '가는 쪽'과 비교 (예전엔 알림장으로 넘어가는 0.14초 사이에 판서를 누르면 '이미 판서'로 보고 무시해 알림장에 남았음)
+function setBoardMode(mode) { if (boardSwitching) return mode === boardSwitchTo; if (mode === currentBoardMode) return true; toggleBoardMode(); return true; }
 /** 3.0.0: 빠른 설정의 '수업 종' = 교시 알람 팝업·종 (교시 알람 설정의 같은 스위치와 같은 값) */
 function isBellEnabled() { return isAlarmPopupEnabled; }
 function setBellEnabled(on) {
@@ -1485,7 +1487,7 @@ function toggleBoardMode() {
     if (editorEl) storage.setItem('smartBoardScroll_' + from, String(editorEl.scrollTop));
 
     // 사라지는 효과 → 내용 교체 → 나타나는 효과
-    boardSwitching = true;
+    boardSwitching = true; boardSwitchTo = to;
     const panel = editorEl ? editorEl.parentElement : null;
     if (editorEl) editorEl.classList.add('sb-mode-out');
     setTimeout(() => {
@@ -1511,7 +1513,7 @@ function toggleBoardMode() {
         if (editorEl) { editorEl.scrollTop = savedScroll; editorEl.classList.remove('sb-mode-out'); editorEl.classList.add('sb-mode-in'); }
         boardEditor.focusNoScroll();
         if (editorEl) editorEl.scrollTop = savedScroll;
-        setTimeout(() => { if (editorEl) editorEl.classList.remove('sb-mode-in'); boardSwitching = false; }, 220);
+        setTimeout(() => { if (editorEl) editorEl.classList.remove('sb-mode-in'); boardSwitching = false; boardSwitchTo = null; }, 220);
         void panel;
     }, 140);
 } // toggleBoardMode 닫기

@@ -203,7 +203,7 @@ body:has(.modal.active) .sb-floating { z-index: 45 !important; }
   background: rgb(var(--sk-surface));
   backdrop-filter: none; -webkit-backdrop-filter: none;
 }
-[data-skin="aurora"] .sb-tool .sb-win-head { background: rgb(var(--sk-surface-2)); }
+[data-skin="aurora"] .sb-tool:not(.sb-tool-note) .sb-win-head { background: rgb(var(--sk-surface-2)); }
 [data-skin="aurora"] #activity-indicator, [data-skin="aurora"] #activity-menu {
   background: rgb(var(--sk-surface)) !important;
   backdrop-filter: none; -webkit-backdrop-filter: none;
@@ -239,3 +239,58 @@ body:has(.modal.active) .sb-floating { z-index: 45 !important; }
 
 /* 지금 교시의 과목 칸: 어두운 테마(다크·바다·그래파이트)에선 bg-white 가 어두운 판넬색이라 진한 과목 글씨가 안 보였음 → 밝은 칸으로 */
 .timetable-slot.bg-brand-500 .slot-subject.bg-white { background-color: #ffffff !important; }
+
+/* ============================================================
+   3.1.1 화면 점검(여러 크기 × 테마)으로 찾은 것
+   ============================================================ */
+
+/* 어두운 테마(다크·바다·그래파이트): 밝은 바탕용으로 고른 진한 색 글씨가 어두운 판 위에서 안 보였음 → 밝은 색으로.
+   단 연한 색 상자(bg-*-50·100) 안은 바탕이 밝으므로 그대로 */
+:is([data-skin="dark"],[data-skin="ocean"],[data-skin="graphite"]) :is(.modal,.sb-widgets,.sb-tool) :is(.text-brand-600,.text-brand-700,.text-brand-800):not(:is(.bg-emerald-50,.bg-emerald-100,.bg-brand-50,.bg-brand-100,.bg-blue-50,.bg-blue-100,.bg-rose-50,.bg-rose-100,.bg-red-50,.bg-red-100,.bg-amber-50,.bg-amber-100,.bg-orange-50,.bg-orange-100,.bg-yellow-50,.bg-yellow-100,.bg-green-50,.bg-green-100,.bg-sky-50,.bg-sky-100,.bg-indigo-50,.bg-indigo-100,.bg-purple-50,.bg-purple-100,.bg-pink-50,.bg-pink-100,.bg-teal-50,.bg-teal-100)):not(:is(.bg-emerald-50,.bg-emerald-100,.bg-brand-50,.bg-brand-100,.bg-blue-50,.bg-blue-100,.bg-rose-50,.bg-rose-100,.bg-red-50,.bg-red-100,.bg-amber-50,.bg-amber-100,.bg-orange-50,.bg-orange-100,.bg-yellow-50,.bg-yellow-100,.bg-green-50,.bg-green-100,.bg-sky-50,.bg-sky-100,.bg-indigo-50,.bg-indigo-100,.bg-purple-50,.bg-purple-100,.bg-pink-50,.bg-pink-100,.bg-teal-50,.bg-teal-100) *) { color: var(--brand-300); }
+:is([data-skin="dark"],[data-skin="ocean"],[data-skin="graphite"]) .modal :is(.text-rose-600,.text-rose-700,.text-rose-800):not(:is(.bg-emerald-50,.bg-emerald-100,.bg-brand-50,.bg-brand-100,.bg-blue-50,.bg-blue-100,.bg-rose-50,.bg-rose-100,.bg-red-50,.bg-red-100,.bg-amber-50,.bg-amber-100,.bg-orange-50,.bg-orange-100,.bg-yellow-50,.bg-yellow-100,.bg-green-50,.bg-green-100,.bg-sky-50,.bg-sky-100,.bg-indigo-50,.bg-indigo-100,.bg-purple-50,.bg-purple-100,.bg-pink-50,.bg-pink-100,.bg-teal-50,.bg-teal-100)):not(:is(.bg-emerald-50,.bg-emerald-100,.bg-brand-50,.bg-brand-100,.bg-blue-50,.bg-blue-100,.bg-rose-50,.bg-rose-100,.bg-red-50,.bg-red-100,.bg-amber-50,.bg-amber-100,.bg-orange-50,.bg-orange-100,.bg-yellow-50,.bg-yellow-100,.bg-green-50,.bg-green-100,.bg-sky-50,.bg-sky-100,.bg-indigo-50,.bg-indigo-100,.bg-purple-50,.bg-purple-100,.bg-pink-50,.bg-pink-100,.bg-teal-50,.bg-teal-100) *) { color: #fda4af; }
+:is([data-skin="dark"],[data-skin="ocean"],[data-skin="graphite"]) .modal :is(.text-emerald-600,.text-emerald-700,.text-emerald-800):not(:is(.bg-emerald-50,.bg-emerald-100,.bg-brand-50,.bg-brand-100,.bg-blue-50,.bg-blue-100,.bg-rose-50,.bg-rose-100,.bg-red-50,.bg-red-100,.bg-amber-50,.bg-amber-100,.bg-orange-50,.bg-orange-100,.bg-yellow-50,.bg-yellow-100,.bg-green-50,.bg-green-100,.bg-sky-50,.bg-sky-100,.bg-indigo-50,.bg-indigo-100,.bg-purple-50,.bg-purple-100,.bg-pink-50,.bg-pink-100,.bg-teal-50,.bg-teal-100)):not(:is(.bg-emerald-50,.bg-emerald-100,.bg-brand-50,.bg-brand-100,.bg-blue-50,.bg-blue-100,.bg-rose-50,.bg-rose-100,.bg-red-50,.bg-red-100,.bg-amber-50,.bg-amber-100,.bg-orange-50,.bg-orange-100,.bg-yellow-50,.bg-yellow-100,.bg-green-50,.bg-green-100,.bg-sky-50,.bg-sky-100,.bg-indigo-50,.bg-indigo-100,.bg-purple-50,.bg-purple-100,.bg-pink-50,.bg-pink-100,.bg-teal-50,.bg-teal-100) *) { color: #6ee7b7; }
+:is([data-skin="dark"],[data-skin="ocean"],[data-skin="graphite"]) .modal :is(.text-blue-600,.text-blue-700):not(:is(.bg-emerald-50,.bg-emerald-100,.bg-brand-50,.bg-brand-100,.bg-blue-50,.bg-blue-100,.bg-rose-50,.bg-rose-100,.bg-red-50,.bg-red-100,.bg-amber-50,.bg-amber-100,.bg-orange-50,.bg-orange-100,.bg-yellow-50,.bg-yellow-100,.bg-green-50,.bg-green-100,.bg-sky-50,.bg-sky-100,.bg-indigo-50,.bg-indigo-100,.bg-purple-50,.bg-purple-100,.bg-pink-50,.bg-pink-100,.bg-teal-50,.bg-teal-100)):not(:is(.bg-emerald-50,.bg-emerald-100,.bg-brand-50,.bg-brand-100,.bg-blue-50,.bg-blue-100,.bg-rose-50,.bg-rose-100,.bg-red-50,.bg-red-100,.bg-amber-50,.bg-amber-100,.bg-orange-50,.bg-orange-100,.bg-yellow-50,.bg-yellow-100,.bg-green-50,.bg-green-100,.bg-sky-50,.bg-sky-100,.bg-indigo-50,.bg-indigo-100,.bg-purple-50,.bg-purple-100,.bg-pink-50,.bg-pink-100,.bg-teal-50,.bg-teal-100) *) { color: #93c5fd; }
+/* 급식·날씨 창의 연한 색 상자 안: 테마가 밝게 바꾼 글씨(text-slate-*)를 다시 진하게 (예전엔 흰 바탕에 흰 글씨) */
+:is([data-skin="dark"],[data-skin="ocean"],[data-skin="graphite"]) :is(#modal-lunch-content,#modal-weather-content) :is(.bg-emerald-50,.bg-brand-50,.bg-blue-50,.bg-orange-50,.bg-red-50,.bg-rose-50,.bg-amber-50) {
+  --sk-text-1: 30 41 59; --sk-text-2: 51 65 85; --sk-text-3: 71 85 105; --sk-text-4: 100 116 139; --sk-text-5: 100 116 139;
+  color: rgb(var(--sk-text-1));
+}
+/* 위젯·떠 있는 창의 강조색 글씨(자세히·크게·일정 날짜·달리는 타이머 숫자·민감도) */
+:is([data-skin="dark"],[data-skin="ocean"],[data-skin="graphite"]) :is(.sb-w-more, .sb-ev-date, .sb-we-count, .sb-noise-row b, #sb-timer-widget[data-state="running"] .sb-wt-time) { color: var(--brand-300); }
+:is([data-skin="dark"],[data-skin="ocean"],[data-skin="graphite"]) #floating-timer:has(#btn-timer-toggle[data-state="running"]) .sb-timer-display:not(.text-red-500) { color: var(--brand-300); }
+:is([data-skin="dark"],[data-skin="ocean"],[data-skin="graphite"]) .sb-w-more:hover { background: rgb(var(--sk-surface-4)); }
+/* 다크 테마의 옅은 글씨(text-slate-400 → --sk-text-5)가 4.5:1 에 조금 모자랐음 */
+[data-skin="dark"] { --sk-text-5: 148 163 184; }
+
+/* 날씨 창 미세먼지 '보통'·'좋음': 연한 바탕 위 옅은 색(2.4:1) → 진하게 */
+#modal-weather-content .bg-emerald-50 .text-emerald-500 { color: #047857; }
+#modal-weather-content .bg-blue-50 .text-blue-500 { color: #1d4ed8; }
+#modal-weather-content .bg-orange-50 .text-orange-500 { color: #c2410c; }
+
+/* 급식 창: '오늘·하루·이번 주' 버튼이 한 글자씩 줄바꿈되던 문제 (창이 내용보다 좁았음) */
+#modal-lunch > .sb-win { width: min(35rem, 94vw); }
+#modal-lunch-content button { white-space: nowrap; flex-shrink: 0; }
+
+/* 시간표: 칸의 최소 높이가 48px 로 고정이라 화면이 낮으면(배율 175%·200%) 5·6교시가 칸 밖으로 밀렸음 → rem 으로 */
+.sb-tt .timetable-slot { min-height: 4.5rem; }
+
+/* 떠 있는 도구 창의 처음 자리: 판서 서식 도구줄을 가리지 않게 조금 위로 (옮긴 뒤에는 옮긴 자리) */
+#floating-timer, #floating-noise-meter, #floating-popup-note { bottom: 13rem; }
+#btn-tool-activity { bottom: 12.75rem; }
+
+/* 설정 창의 시간·선택 칸이 좁은 화면에서 값이 잘렸음 */
+#input-leave-work-time, #select-leave-work-duration { min-width: 7.5rem; }
+#setting-lunch-pos { min-width: 6rem; }
+
+/* 팝업 노트 안내 글씨가 너무 옅었음 (2.4:1 → 4.6:1) */
+#popup-note-textarea::placeholder { color: #a16207; }
+
+/* 줄바꿈하면 모양이 깨지는 짧은 이름들 */
+.skin-card, #seg-board, #seg-notice, .sb-we-count, #settings-widgets button { white-space: nowrap; }
+button[onclick="changeBgColor('skin')"], button[onclick="changePanelColor('skin')"] { white-space: nowrap; }
+/* 위젯 칸이 넘치면 아래쪽을 흐리게 (src/widgets.ts initScrollCue) */
+.sb-widgets.sb-more-below { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3.5rem), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 3.5rem), transparent); }
+/* 연한 색 상자 안이라도 칸 자체가 bg-white(어두운 테마에선 어두운 판넬색)면 밝은 글씨로 */
+:is([data-skin="dark"],[data-skin="ocean"],[data-skin="graphite"]) .modal .bg-white:is(.text-rose-600,.text-rose-700,.text-rose-800) { color: #fda4af; }
+:is([data-skin="dark"],[data-skin="ocean"],[data-skin="graphite"]) .modal .bg-white:is(.text-brand-600,.text-brand-700,.text-brand-800) { color: var(--brand-300); }
+:is([data-skin="dark"],[data-skin="ocean"],[data-skin="graphite"]) .modal .bg-white:is(.text-emerald-600,.text-emerald-700,.text-emerald-800) { color: #6ee7b7; }

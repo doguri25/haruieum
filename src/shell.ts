@@ -104,10 +104,14 @@ function syncBoardMode() {
   const b = $("sb-board");
   if (b) { b.dataset.mode = mode; b.setAttribute("aria-label", mode === "notice" ? "알림장" : "판서"); }
 }
+let wantedMode: "board" | "notice" = "board", modeRetry: number | undefined;
 export function setBoardMode(mode: "board" | "notice") {
+  // 3.1.1: 빠르게 여러 번 누르면 마지막에 누른 쪽으로 (기다리던 다시 시도는 취소)
+  wantedMode = mode;
+  window.clearTimeout(modeRetry);
   const ok = call("setBoardMode", mode);
   // 전환 효과 중이면 끝난 뒤 한 번 더
-  if (ok === false) window.setTimeout(() => setBoardMode(mode), 260);
+  if (ok === false) modeRetry = window.setTimeout(() => setBoardMode(wantedMode), 260);
   window.setTimeout(syncBoardMode, 200);
 }
 

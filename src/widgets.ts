@@ -265,7 +265,19 @@ export function openEditor() {
 }
 
 // ---------------------------------------------------------------- 시작
+// 3.1.1: 위젯을 많이 켜서 칸 아래로 넘치면 아래쪽을 흐리게 해 '더 있음'을 알려 줌 (예전엔 날씨 위젯이 칸 밖에 숨어 있어도 몰랐음)
+function initScrollCue() {
+  const col = $("sb-widgets"); if (!col) return;
+  const update = () => col.classList.toggle("sb-more-below", col.scrollHeight - col.scrollTop - col.clientHeight > 4);
+  col.addEventListener("scroll", update, { passive: true });
+  const ro = new ResizeObserver(update);
+  ro.observe(col);
+  col.querySelectorAll<HTMLElement>(":scope > *").forEach((c) => ro.observe(c));
+  update();
+}
+
 export function initWidgets() {
+  initScrollCue();
   initMemo();
   initTimer();
   initEditor();
